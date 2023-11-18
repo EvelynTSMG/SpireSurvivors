@@ -5,6 +5,7 @@ import SpireSurvivors.cards.abstracts.AbstractRelicCard;
 import SpireSurvivors.cards.abstracts.AbstractWeaponCard;
 import SpireSurvivors.dungeon.SurvivorDungeon;
 import SpireSurvivors.ui.MovementTutorial;
+import SpireSurvivors.ui.elements.ProgressBar;
 import SpireSurvivors.util.PolygonHelper;
 import SpireSurvivors.weapons.abstracts.AbstractSurvivorWeapon;
 import basemod.ReflectionHacks;
@@ -12,6 +13,7 @@ import basemod.abstracts.CustomPlayer;
 import basemod.animations.AbstractAnimation;
 import basemod.animations.SpriterAnimation;
 import com.badlogic.gdx.Gdx;
+import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.brashmonkey.spriter.Player;
 import com.megacrit.cardcrawl.characters.AbstractPlayer;
@@ -66,6 +68,12 @@ public abstract class AbstractSurvivorPlayer extends AbstractSurvivorEntity {
     public MovementTutorial movementTutorial = new MovementTutorial();
     public static final float MOVEMENT_TUTORIAL_OFFSET = 80f * Settings.scale;
 
+    public ProgressBar healthBar;
+    public static final Texture HEALTH_BAR_BG = new Texture("SpireSurvivorsResources/images/ui/bars/health-bg.png");
+    public static final Texture HEALTH_BAR_FILL = new Texture("SpireSurvivorsResources/images/ui/bars/health-fill.png");
+    public static final float HEALTH_BAR_SCALE = 0.5f;
+    public static final float HEALTH_BAR_OFFSET = 60f;
+
     public AbstractSurvivorPlayer(AbstractPlayer p) {
         speed = 5f;
         damageModifier = 1f;
@@ -77,6 +85,9 @@ public abstract class AbstractSurvivorPlayer extends AbstractSurvivorEntity {
         basePlayer.hb.move(Settings.WIDTH / 2f, Settings.HEIGHT / 2f + basePlayer.hb.height / 2f);
         hitbox = PolygonHelper.fromHitbox(basePlayer.hb);
         basePlayer.showHealthBar();
+
+        healthBar = new ProgressBar(HEALTH_BAR_BG, HEALTH_BAR_FILL, null,
+                0, basePlayer.maxHealth, basePlayer.currentHealth, 0);
 
         if (basePlayer instanceof CustomPlayer) {
             AbstractAnimation animation = ReflectionHacks.getPrivate(basePlayer, CustomPlayer.class, "animation");
@@ -137,13 +148,19 @@ public abstract class AbstractSurvivorPlayer extends AbstractSurvivorEntity {
         if (invTime > 0) invTime -= Gdx.graphics.getDeltaTime();
         if (invTime < 0) invTime = 0;
         this.basePlayer.flipHorizontal = InputHelper.mX < basePlayer.hb.cX;
+
+        healthBar.setProgress(basePlayer.currentHealth);
+        healthBar.update();
+
         ReflectionHacks.privateMethod(AbstractCreature.class, "updateHealthBar").invoke(basePlayer);
     }
 
     @Override
     public void render(SpriteBatch sb) {
         basePlayer.renderPlayerImage(sb);
-        basePlayer.renderHealth(sb);
+
+        // TODO: Fix healthbar overlapping some characters, finetune healthbar position
+        healthBar.render(sb, basePlayer.hb.cX, basePlayer.hb.y + basePlayer.hb.height + HEALTH_BAR_OFFSET, HEALTH_BAR_SCALE);
 
         if (!SpireSurvivorsMod.seenMovementTutorial) {
             movementTutorial.render(sb, basePlayer.hb.cX, basePlayer.hb.y - MOVEMENT_TUTORIAL_OFFSET);
