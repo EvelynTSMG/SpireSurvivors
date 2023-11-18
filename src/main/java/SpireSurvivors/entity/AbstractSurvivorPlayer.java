@@ -159,8 +159,10 @@ public abstract class AbstractSurvivorPlayer extends AbstractSurvivorEntity {
     public void render(SpriteBatch sb) {
         basePlayer.renderPlayerImage(sb);
 
-        // TODO: Fix healthbar overlapping some characters, finetune healthbar position
-        healthBar.render(sb, basePlayer.hb.cX, basePlayer.hb.y + basePlayer.hb.height + HEALTH_BAR_OFFSET, HEALTH_BAR_SCALE);
+        if (basePlayer.currentHealth != basePlayer.maxHealth) {
+            // TODO: Fix healthbar overlapping some characters, finetune healthbar position
+            healthBar.render(sb, basePlayer.hb.cX, basePlayer.hb.y + basePlayer.hb.height + HEALTH_BAR_OFFSET, HEALTH_BAR_SCALE);
+        }
 
         if (!SpireSurvivorsMod.seenMovementTutorial) {
             movementTutorial.render(sb, basePlayer.hb.cX, basePlayer.hb.y - MOVEMENT_TUTORIAL_OFFSET);
