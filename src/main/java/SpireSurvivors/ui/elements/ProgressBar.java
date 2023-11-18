@@ -84,8 +84,6 @@ public class ProgressBar {
                 Settings.scale * scaleX, Settings.scale * scaleY, 0);
         }
 
-        SpireSurvivorsMod.logger.info("Fill%: {}", getPercentage());
-
         sb.draw(new TextureRegion(fill), x - fill.getWidth()/2f, y - fill.getHeight()/2f,
             fill.getWidth()/2f, fill.getHeight()/2f,
             fill.getWidth() * getPercentage(), fill.getHeight(),
