@@ -42,7 +42,7 @@ public abstract class AbstractSurvivorInteractable {
         bob.update();
         if (!collideOnly) {
             Vector2 dist = new Vector2(SurvivorDungeon.player.basePlayer.hb.cX - hb.cX, SurvivorDungeon.player.basePlayer.hb.cY - hb.cY);
-            if (dist.len() <= SurvivorDungeon.player.pickupRangeMultiplier * AbstractSurvivorPlayer.PICKUP_RANGE) {
+            if (dist.len() <= SurvivorDungeon.player.pickupRangeMultiplier * AbstractSurvivorPlayer.PICKUP_PULL_RANGE) {
                 dist.nor();
                 dist.scl(10f * Settings.scale);
                 move(dist.x, dist.y);
