@@ -3,15 +3,23 @@ package SpireSurvivors.pickups;
 import SpireSurvivors.dungeon.SurvivorDungeon;
 import SpireSurvivors.entity.AbstractSurvivorPlayer;
 import SpireSurvivors.pickups.AbstractPickup.PickupType;
+import basemod.Pair;
 import basemod.ReflectionHacks;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.math.Vector2;
 import sun.misc.Unsafe;
 
+import java.sql.Array;
 import java.util.ArrayList;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 
+/**
+ * Defines and manages a pool of pickups
+ * @see PickupStruct
+ * @see AbstractPickup
+ */
 public class PickupPool {
     private final static Unsafe unsafe = ReflectionHacks.getPrivateStatic(Unsafe.class, "theUnsafe");
     public final static int POOL_SIZE = 1024;
@@ -22,7 +30,9 @@ public class PickupPool {
         poolAddress = unsafe.allocateMemory(POOL_SIZE * PickupStruct.SIZE);
     }
 
-    public void spawn(float x, float y, PickupType type) {
+    public void spawn(float x, float y, PickupType type, int compression, boolean shouldCompress) {
+        if (shouldCompress) compression = tryCompress(x, y, type, compression);
+
         long address = getInactive();
         PickupStruct.clear(address);
 
@@ -34,11 +44,99 @@ public class PickupPool {
 
         PickupStruct.scale(address, 1f);
         PickupStruct.bobTimer(address, MathUtils.random(0, (float)Math.PI * 2));
+
+        PickupStruct.compression(compression);
+        PickupStruct.flags(address, type.flags);
     }
 
     public void remove(long address) {
         PickupStruct.type(address, PickupType.INACTIVE);
         usedPickups -= 1;
+    }
+
+    public int tryCompress(float x, float y, PickupType type, int compression) {
+        @SuppressWarnings("unchecked")
+        Pair<Integer, ArrayList<Long>>[] buckets = new Pair[32];
+        for (int i = 0; i < buckets.length; i++) {
+            buckets[i] = new Pair<>(0, new ArrayList<>());
+        }
+
+        runForNearby(x, y, AbstractPickup.COMPRESSION_RANGE, address -> {
+            if (PickupStruct.type(address) == type) {
+                Pair<Integer, ArrayList<Long>> p = buckets[PickupStruct.compression(address) * AbstractPickup.COMPRESSION_FACTOR];
+                p.getValue().add(address);
+                buckets[PickupStruct.compression(address) * AbstractPickup.COMPRESSION_FACTOR] = new Pair<>(p.getKey() + 1, p.getValue());
+            }
+        });
+
+        int goal = (compression + 1) * AbstractPickup.COMPRESSION_FACTOR;
+        int goal_n = buckets[goal].getKey() + 1;
+        int last_goal_reached = 0; // may not be needed?
+        int last_goal_n = 0; // may not be needed?
+        for (int i = 0; i < buckets.length; i++) {
+            if (i == goal) {
+                if (buckets[i].getKey() >= goal_n) {
+                    last_goal_reached = goal;
+                    last_goal_n = goal_n;
+
+                    if (!canAchieveNextCompression(buckets, goal, i)) break;
+
+                    goal += AbstractPickup.COMPRESSION_FACTOR;
+                    goal_n = buckets[goal].getKey() + 1;
+                } else break;
+            }
+            if (i == buckets.length - 1) break;
+
+            int count = buckets[i].getKey();
+            ArrayList<Long> list = buckets[i].getValue();
+            ArrayList<Long> list_next = buckets[i + 1].getValue();
+
+            if (count % 2 == 1) {
+                list_next.addAll(list.subList(1, list.size()));
+
+                long first = 0;
+                list.clear();
+                list.add(first);
+            } else {
+                list_next.addAll(list);
+                list.clear();
+            }
+
+            buckets[i] = new Pair<>(count % 2, list);
+            buckets[i + 1] = new Pair<>(buckets[i + 1].getKey() + (count/2), list_next);
+        }
+
+        int extras = buckets[last_goal_reached].getKey() - last_goal_n;
+
+        for (long address : buckets[last_goal_reached].getValue()) {
+            if (PickupStruct.compression(address) != last_goal_reached) {
+                remove(address);
+            }
+        }
+        compression = last_goal_reached / AbstractPickup.COMPRESSION_FACTOR;
+
+        for (int i = 0; i < extras; i++) {
+            float extraX = x + MathUtils.random(-AbstractPickup.COMPRESSION_SPAWN_RANGE/2f, AbstractPickup.COMPRESSION_SPAWN_RANGE/2f);
+            float extraY = y + MathUtils.random(-AbstractPickup.COMPRESSION_SPAWN_RANGE/2f, AbstractPickup.COMPRESSION_SPAWN_RANGE/2f);
+            spawn(extraX, extraY, type, compression, false);
+        }
+
+        return compression;
+    }
+
+    private boolean canAchieveNextCompression(Pair<Integer, ArrayList<Long>>[] buckets, int goal, int i) {
+        // Max compression achieved
+        int next_goal = goal + AbstractPickup.COMPRESSION_FACTOR;
+        if (next_goal >= buckets.length) return false;
+
+        // There's not enough to compress further
+        int next_goal_n = buckets[next_goal].getKey() + 1;
+        int sum = 0;
+        for (int j = 0; j < AbstractPickup.COMPRESSION_FACTOR; j++) {
+            sum /= 2;
+            sum += buckets[i + j].getKey();
+        }
+        return sum >= next_goal_n;
     }
 
     public void runForNearby(float x, float y, float r, Consumer<Long> action) {
@@ -57,6 +155,18 @@ public class PickupPool {
             float dx = PickupStruct.x(address) - x;
             float dy = PickupStruct.y(address) - y;
             if (dx*dx + dy*dy <= r*r) {
+                pickups.add(address);
+            }
+        });
+        return pickups;
+    }
+
+    public ArrayList<Long> nearby(float x, float y, float r, Predicate<Long> filter) {
+        ArrayList<Long> pickups = new ArrayList<>();
+        forEach(address -> {
+            float dx = PickupStruct.x(address) - x;
+            float dy = PickupStruct.y(address) - y;
+            if (dx*dx + dy*dy <= r*r && filter.test(address)) {
                 pickups.add(address);
             }
         });
@@ -94,23 +204,27 @@ public class PickupPool {
 
             // Try to collect pickup
             if (dx*dx + dy*dy <= AbstractSurvivorPlayer.PICKUP_COLLECT_RANGE) {
-                AbstractPickup.onTouch(address);
-                remove(address);
+                PickupStruct.type(address).onTouch(address);
+                if (PickupStruct.type(address).canCollect(address)) {
+                    remove(address);
+                    return;
+                }
             }
 
             // Bobby Pickups
-            PickupStruct.bobTimer(address, PickupStruct.bobTimer(address) + Gdx.graphics.getDeltaTime());
-            if (PickupStruct.bobTimer(address) > Math.PI * 2) {
-                // Preemptively avoiding reaching limits in long runs
-                PickupStruct.bobTimer(address, PickupStruct.bobTimer(address) - (float)Math.PI * 2);
+            if (!PickupStruct.noBob(address)) {
+                PickupStruct.bobTimer(address, PickupStruct.bobTimer(address) + Gdx.graphics.getDeltaTime());
+                if (PickupStruct.bobTimer(address) > Math.PI * 2) {
+                    // Preemptively avoiding reaching limits in long runs
+                    PickupStruct.bobTimer(address, PickupStruct.bobTimer(address) - (float)Math.PI * 2);
+                }
+
             }
 
             // Try to pull towards player
             if (!PickupStruct.noPull(address)) {
                 if (dx*dx + dy*dy <= pullRange*pullRange) {
-                    Vector2 distance = new Vector2(dx, dy).nor().scl(AbstractSurvivorPlayer.PICKUP_PULL_SPEED);
-                    PickupStruct.x(address, PickupStruct.x(address) + distance.x);
-                    PickupStruct.y(address, PickupStruct.y(address) + distance.y);
+                    PickupStruct.type(address).pull(address);
                 }
             }
         });

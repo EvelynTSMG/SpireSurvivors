@@ -1,6 +1,5 @@
 package SpireSurvivors.pickups;
 
-import SpireSurvivors.dungeon.SurvivorDungeon;
 import basemod.ReflectionHacks;
 import com.badlogic.gdx.math.MathUtils;
 import jdk.internal.vm.annotation.ForceInline;
@@ -28,9 +27,11 @@ public final class PickupStruct {
     private final static int OFFSET_TYPE = 0x14;
     private final static int OFFSET_COMPRESSION = 0x18;
     private final static int OFFSET_FLAGS = 0x1C;
-        private final static int FLAG_NO_PULL = 1;
-        private final static int FLAG_NO_COMPRESSION = 1 << 1;
-        private final static int FLAG_NO_BOB = 1 << 2;
+        public final static int FLAG_NO_PULL = 1;
+        public final static int FLAG_NO_COMPRESSION = 1 << 1;
+        public final static int FLAG_NO_BOB = 1 << 2;
+        public final static int FLAG_PERSISTENT = 1 << 3;
+        public final static int FLAG_ALL = 0xFFFFFFFF;
 
     @ForceInline
     public static long alloc() {
@@ -118,6 +119,16 @@ public final class PickupStruct {
     }
 
     @ForceInline
+    public static int flags(long baseAddress) {
+        return unsafe.getInt(baseAddress + OFFSET_FLAGS);
+    }
+
+    @ForceInline
+    public static void flags(long baseAddress, int value) {
+        unsafe.putInt(baseAddress + OFFSET_FLAGS, value);
+    }
+
+    @ForceInline
     public static boolean noPull(long baseAddress) {
         return (unsafe.getInt(baseAddress + OFFSET_FLAGS) & FLAG_NO_PULL) != 0;
     }
@@ -154,6 +165,18 @@ public final class PickupStruct {
     }
 
     @ForceInline
+    public static boolean persistent(long baseAddress) {
+        return (unsafe.getInt(baseAddress + OFFSET_FLAGS) & FLAG_PERSISTENT) != 0;
+    }
+
+    @ForceInline
+    public static void persistent(long baseAddress, boolean value) {
+        int x = unsafe.getInt(baseAddress + OFFSET_FLAGS);
+        x = value ? x | FLAG_PERSISTENT : x & ~FLAG_PERSISTENT;
+        unsafe.putInt(baseAddress + OFFSET_FLAGS, x);
+    }
+
+    @ForceInline
     public static float drawY(long baseAddress, float bobDistance) {
         return PickupStruct.y(baseAddress) + MathUtils.sin(PickupStruct.bobTimer(baseAddress)) * bobDistance;
     }
@@ -161,5 +184,10 @@ public final class PickupStruct {
     @ForceInline
     public static int value(long baseAddress) {
         return 1 << (compression(baseAddress) * AbstractPickup.COMPRESSION_FACTOR);
+    }
+
+    @ForceInline
+    public static int value(int compression) {
+        return 1 << (compression * AbstractPickup.COMPRESSION_FACTOR);
     }
 }
