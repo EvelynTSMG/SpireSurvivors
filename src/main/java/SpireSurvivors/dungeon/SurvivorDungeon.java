@@ -5,7 +5,9 @@ import SpireSurvivors.characters.BasicCharacter;
 import SpireSurvivors.entity.AbstractSurvivorMonster;
 import SpireSurvivors.entity.AbstractSurvivorPlayer;
 import SpireSurvivors.patches.CardCrawlGamePatches;
+import SpireSurvivors.pickups.AbstractPickup;
 import SpireSurvivors.pickups.AbstractSurvivorInteractable;
+import SpireSurvivors.pickups.PickupPool;
 import SpireSurvivors.pickups.XPPickup;
 import SpireSurvivors.screens.survivorGame.SurvivorChoiceScreen;
 import SpireSurvivors.screens.survivorGame.SurvivorPauseScreen;
@@ -19,6 +21,7 @@ import com.badlogic.gdx.graphics.g2d.TextureAtlas;
 import com.badlogic.gdx.maps.tiled.TiledMap;
 import com.badlogic.gdx.maps.tiled.TmxMapLoader;
 import com.badlogic.gdx.maps.tiled.renderers.OrthogonalTiledMapRenderer;
+import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.math.Vector2;
 import com.megacrit.cardcrawl.characters.AbstractPlayer;
 import com.megacrit.cardcrawl.core.CardCrawlGame;
@@ -52,7 +55,7 @@ public class SurvivorDungeon {
     public static AbstractSurvivorPlayer player;
     public static SurvivorUI ui;
     public static ArrayList<AbstractSurvivorMonster> monsters = new ArrayList<>();
-    public static ArrayList<AbstractSurvivorInteractable> pickups = new ArrayList<>();
+    public static ArrayList<PickupPool> pickupPools = new ArrayList<>();
     public static ArrayList<AbstractGameEffect> effects = new ArrayList<>();
     public static ArrayList<AbstractGameEffect> effectsQueue = new ArrayList<>();
 
@@ -75,7 +78,7 @@ public class SurvivorDungeon {
             Method register = lightsOutMod.getMethod("registerLightManager", String.class, Collection.class);
             register.invoke(null, SpireSurvivorsMod.makeID("DungeonEffects"), effects);
             register.invoke(null, SpireSurvivorsMod.makeID("DungeonMonster"), monsters);
-            register.invoke(null, SpireSurvivorsMod.makeID("DungeonPickups"), pickups);
+            register.invoke(null, SpireSurvivorsMod.makeID("DungeonPickups"), pickupPools);
             SpireSurvivorsMod.logger.info("Lights Out detected, dungeon supports lighting");
         } catch (ClassNotFoundException | NoSuchMethodException | InvocationTargetException | IllegalAccessException ignored) {}
     }
@@ -98,6 +101,20 @@ public class SurvivorDungeon {
         camera.setToOrtho(false);
         map = new TmxMapLoader().load(SpireSurvivorsMod.getModID()+"Resources/tiled/TestMap.tmx");
         mapRenderer = new OrthogonalTiledMapRenderer(map, 16f * Settings.scale);
+
+        pickupPools.add(new PickupPool());
+    }
+
+    public long spawnPickup(float x, float y, AbstractPickup.PickupType type, int compression, boolean shouldCompress) {
+        for (PickupPool pool : pickupPools) {
+            if (!pool.isFull()) {
+                return pool.spawn(x, y, type, compression, shouldCompress);
+            }
+        }
+
+        // All pools must be full, so we add one more
+        pickupPools.add(new PickupPool());
+        return pickupPools.get(pickupPools.size() - 1).spawn(x, y, type, compression, shouldCompress);
     }
 
     public void update() {
@@ -127,26 +144,37 @@ public class SurvivorDungeon {
         updateInput();
         monsters.removeIf(m -> {
             if (m.monster.isDead) {
-                pickups.add(new XPPickup(m.expAmount, m.monster.hb.cX, m.monster.hb.cY));
+                for (int i = 0; i < m.xpCount; i++) {
+                    float x = m.monster.hb.cX;
+                    float y = m.monster.hb.cY;
+                    if (m.xpCount > 1) {
+                        x += MathUtils.random(-AbstractPickup.SCATTER_RANGE, AbstractPickup.SCATTER_RANGE);
+                        y += MathUtils.random(-AbstractPickup.SCATTER_RANGE, AbstractPickup.SCATTER_RANGE);
+                    }
+                    spawnPickup(x, y, AbstractPickup.PickupType.XP, m.xpCompression, false);
+                }
             }
             return m.monster.isDead;
         });
+
         for (AbstractSurvivorMonster m : monsters) {
             m.update();
         }
         spawnController.update();
+
         effects.addAll(effectsQueue);
         effectsQueue.clear();
         effects.addAll(AbstractDungeon.effectsQueue);
         AbstractDungeon.effectsQueue.clear();
+
         for (AbstractGameEffect e : effects) {
             e.update();
         }
         effects.removeIf(e -> e.isDone);
-        for (AbstractSurvivorInteractable i : pickups) {
-            i.update();
+
+        for (PickupPool pool : pickupPools) {
+            pool.update();
         }
-        pickups.removeIf(i -> i.isDone);
 
         if (player.basePlayer.isDead) {
             CardCrawlGame.startOver();
@@ -194,8 +222,8 @@ public class SurvivorDungeon {
         for (AbstractSurvivorMonster m : monsters) {
             m.move(-dir.x, -dir.y);
         }
-        for (AbstractSurvivorInteractable i : pickups) {
-            i.move(-dir.x, -dir.y);
+        for (PickupPool pool : pickupPools) {
+            pool.move(-dir.x, -dir.y);
         }
         worldX += dir.x;
         worldY += dir.y;
@@ -209,23 +237,29 @@ public class SurvivorDungeon {
         mapRenderer.setView(camera);
         mapRenderer.render();
         sb.begin();
-        for (AbstractSurvivorInteractable i : pickups) {
-            i.render(sb);
+
+        for (PickupPool pool : pickupPools) {
+            pool.render(sb);
         }
+
         for (AbstractSurvivorMonster m : monsters) {
             if (m.monster.hb.cY <= Settings.HEIGHT/2f) {
                 m.render(sb);
             }
         }
+
         player.render(sb);
+
         for (AbstractSurvivorMonster m : monsters) {
             if (m.monster.hb.cY > Settings.HEIGHT/2f) {
                 m.render(sb);
             }
         }
+
         for (AbstractGameEffect e : effects) {
             e.render(sb);
         }
+
         ui.render(sb);
         switch (currentScreen) {
             case PAUSE:
@@ -239,6 +273,7 @@ public class SurvivorDungeon {
             case NONE:
                 break;
         }
+
         dynamicBanner.render(sb);
     }
 
@@ -246,7 +281,7 @@ public class SurvivorDungeon {
         monsters.clear();
         effects.clear();
         effectsQueue.clear();
-        pickups.clear();
+        pickupPools.clear();
         if (map != null) {
             map.dispose();
         }

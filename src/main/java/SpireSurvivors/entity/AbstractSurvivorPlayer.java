@@ -27,9 +27,9 @@ import java.lang.reflect.Field;
 import java.util.ArrayList;
 
 public abstract class AbstractSurvivorPlayer extends AbstractSurvivorEntity {
-    public final static float PICKUP_PULL_SPEED = 0.2f * Settings.scale;
-    public static final float PICKUP_PULL_RANGE = 100f * Settings.scale;
-    public static final float PICKUP_COLLECT_RANGE = 10f * Settings.scale;
+    public final static float PICKUP_PULL_SPEED = 10f * Settings.scale;
+    public static final float PICKUP_PULL_RANGE = 150f * Settings.scale;
+    public static final float PICKUP_COLLECT_RANGE = 45f * Settings.scale;
     public static final float INV_TIME = 0.5f;
 
     public AbstractPlayer basePlayer;

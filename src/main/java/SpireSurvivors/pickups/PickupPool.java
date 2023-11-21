@@ -6,11 +6,13 @@ import SpireSurvivors.pickups.AbstractPickup.PickupType;
 import basemod.Pair;
 import basemod.ReflectionHacks;
 import com.badlogic.gdx.Gdx;
+import com.badlogic.gdx.graphics.Texture;
+import com.badlogic.gdx.graphics.g2d.SpriteBatch;
+import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.math.MathUtils;
-import com.badlogic.gdx.math.Vector2;
+import com.megacrit.cardcrawl.core.Settings;
 import sun.misc.Unsafe;
 
-import java.sql.Array;
 import java.util.ArrayList;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
@@ -28,9 +30,20 @@ public class PickupPool {
 
     public PickupPool() {
         poolAddress = unsafe.allocateMemory(POOL_SIZE * PickupStruct.SIZE);
+
+        // We have to set everything to Inactive so we don't accidentally clog
+        long address = poolAddress + (int)ReflectionHacks.getPrivateStatic(PickupStruct.class, "OFFSET_TYPE");
+        for (int i = 0; i < POOL_SIZE; i++, address += PickupStruct.SIZE) {
+            // Serializing kinda slow, so we do it manually :3
+            unsafe.putInt(address, 0);
+        }
     }
 
-    public void spawn(float x, float y, PickupType type, int compression, boolean shouldCompress) {
+    public boolean isFull() {
+        return usedPickups >= POOL_SIZE;
+    }
+
+    public long spawn(float x, float y, PickupType type, int compression, boolean shouldCompress) {
         if (shouldCompress) compression = tryCompress(x, y, type, compression);
 
         long address = getInactive();
@@ -45,8 +58,9 @@ public class PickupPool {
         PickupStruct.scale(address, 1f);
         PickupStruct.bobTimer(address, MathUtils.random(0, (float)Math.PI * 2));
 
-        PickupStruct.compression(compression);
+        PickupStruct.compression(address, compression);
         PickupStruct.flags(address, type.flags);
+        return address;
     }
 
     public void remove(long address) {
@@ -55,9 +69,14 @@ public class PickupPool {
     }
 
     public int tryCompress(float x, float y, PickupType type, int compression) {
+        // How to optimize:
+        // use literally anything that doesn't require getter methods and constantly creating new instances
+        // instead of these Pair<Integer, ArrayList<Long>> objects
+
         @SuppressWarnings("unchecked")
         Pair<Integer, ArrayList<Long>>[] buckets = new Pair[32];
         for (int i = 0; i < buckets.length; i++) {
+            if (i == compression * AbstractPickup.COMPRESSION_FACTOR) buckets[i] = new Pair<>(1, new ArrayList<>());
             buckets[i] = new Pair<>(0, new ArrayList<>());
         }
 
@@ -116,8 +135,8 @@ public class PickupPool {
         compression = last_goal_reached / AbstractPickup.COMPRESSION_FACTOR;
 
         for (int i = 0; i < extras; i++) {
-            float extraX = x + MathUtils.random(-AbstractPickup.COMPRESSION_SPAWN_RANGE/2f, AbstractPickup.COMPRESSION_SPAWN_RANGE/2f);
-            float extraY = y + MathUtils.random(-AbstractPickup.COMPRESSION_SPAWN_RANGE/2f, AbstractPickup.COMPRESSION_SPAWN_RANGE/2f);
+            float extraX = x + MathUtils.random(-AbstractPickup.SCATTER_RANGE, AbstractPickup.SCATTER_RANGE);
+            float extraY = y + MathUtils.random(-AbstractPickup.SCATTER_RANGE, AbstractPickup.SCATTER_RANGE);
             spawn(extraX, extraY, type, compression, false);
         }
 
@@ -197,15 +216,21 @@ public class PickupPool {
     public void update() {
         float playerX = SurvivorDungeon.player.basePlayer.hb.cX;
         float playerY = SurvivorDungeon.player.basePlayer.hb.cY;
-        float pullRange = SurvivorDungeon.player.pickupRangeMultiplier * AbstractSurvivorPlayer.PICKUP_PULL_RANGE;
+
+        double pullRange = Math.pow(SurvivorDungeon.player.pickupRangeMultiplier * AbstractSurvivorPlayer.PICKUP_PULL_RANGE, 2);
+        double collectRange = Math.pow(AbstractSurvivorPlayer.PICKUP_COLLECT_RANGE, 2);
+
         forEach(address -> {
             float dx = PickupStruct.x(address) - playerX;
             float dy = PickupStruct.y(address) - playerY;
 
+            if (!PickupStruct.type(address).update(address)) return;
+
             // Try to collect pickup
-            if (dx*dx + dy*dy <= AbstractSurvivorPlayer.PICKUP_COLLECT_RANGE) {
+            if (dx*dx + dy*dy <= collectRange) {
                 PickupStruct.type(address).onTouch(address);
                 if (PickupStruct.type(address).canCollect(address)) {
+                    PickupStruct.type(address).onCollect(address);
                     remove(address);
                     return;
                 }
@@ -213,7 +238,8 @@ public class PickupPool {
 
             // Bobby Pickups
             if (!PickupStruct.noBob(address)) {
-                PickupStruct.bobTimer(address, PickupStruct.bobTimer(address) + Gdx.graphics.getDeltaTime());
+                float bobTimerDelta = Gdx.graphics.getDeltaTime() * PickupStruct.type(address).bobSpeed;
+                PickupStruct.bobTimer(address, PickupStruct.bobTimer(address) + bobTimerDelta);
                 if (PickupStruct.bobTimer(address) > Math.PI * 2) {
                     // Preemptively avoiding reaching limits in long runs
                     PickupStruct.bobTimer(address, PickupStruct.bobTimer(address) - (float)Math.PI * 2);
@@ -223,10 +249,31 @@ public class PickupPool {
 
             // Try to pull towards player
             if (!PickupStruct.noPull(address)) {
-                if (dx*dx + dy*dy <= pullRange*pullRange) {
+                if (dx*dx + dy*dy <= pullRange) {
                     PickupStruct.type(address).pull(address);
                 }
             }
+        });
+    }
+
+    public void render(SpriteBatch sb) {
+        forEach(address -> {
+            PickupType type = PickupStruct.type(address);
+            if (type.image != null) {
+                Texture t = type.image.getTexture();
+                sb.draw(new TextureRegion(type.image), PickupStruct.x(address), PickupStruct.drawY(address, type.bobDistance),
+                        t.getWidth()/2f, t.getHeight()/2f,
+                        t.getWidth(), t.getHeight(),
+                        PickupStruct.scale(address) * Settings.scale, PickupStruct.scale(address) * Settings.scale,
+                        PickupStruct.rotation(address));
+            }
+        });
+    }
+
+    public void move(float x, float y) {
+        forEach(address -> {
+            PickupStruct.x(address, PickupStruct.x(address) + x);
+            PickupStruct.y(address, PickupStruct.y(address) + y);
         });
     }
 }

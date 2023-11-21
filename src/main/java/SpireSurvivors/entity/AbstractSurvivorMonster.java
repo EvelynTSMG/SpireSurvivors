@@ -25,7 +25,8 @@ public abstract class AbstractSurvivorMonster extends AbstractSurvivorEntity {
 
     public AbstractMonster monster;
     public MonsterCollisionWeapon collisionWeapon;
-    public int expAmount = 1;
+    public int xpCompression = 0;
+    public int xpCount = 1;
 
     public AbstractSurvivorMonster(AbstractMonster m, int collisionDamage, float moveSpeed) {
         monster = m;
