@@ -92,6 +92,12 @@ public class PickupPool {
         int goal_n = buckets[goal].getKey() + 1;
         int last_goal_reached = 0; // may not be needed?
         int last_goal_n = 0; // may not be needed?
+
+        if (!canAchieveNextCompression(buckets, compression * AbstractPickup.COMPRESSION_FACTOR, 0)) {
+            // We can't do anything
+            return compression;
+        }
+
         for (int i = 0; i < buckets.length; i++) {
             if (i == goal) {
                 if (buckets[i].getKey() >= goal_n) {
@@ -113,7 +119,7 @@ public class PickupPool {
             if (count % 2 == 1) {
                 list_next.addAll(list.subList(1, list.size()));
 
-                long first = 0;
+                long first = list.get(0);
                 list.clear();
                 list.add(first);
             } else {
@@ -134,6 +140,7 @@ public class PickupPool {
         }
         compression = last_goal_reached / AbstractPickup.COMPRESSION_FACTOR;
 
+        // Spawn collateral
         for (int i = 0; i < extras; i++) {
             float extraX = x + MathUtils.random(-AbstractPickup.SCATTER_RANGE, AbstractPickup.SCATTER_RANGE);
             float extraY = y + MathUtils.random(-AbstractPickup.SCATTER_RANGE, AbstractPickup.SCATTER_RANGE);
@@ -151,9 +158,9 @@ public class PickupPool {
         // There's not enough to compress further
         int next_goal_n = buckets[next_goal].getKey() + 1;
         int sum = 0;
-        for (int j = 0; j < AbstractPickup.COMPRESSION_FACTOR; j++) {
+        for (int j = i; j < next_goal; j++) {
             sum /= 2;
-            sum += buckets[i + j].getKey();
+            sum += buckets[j].getKey();
         }
         return sum >= next_goal_n;
     }
