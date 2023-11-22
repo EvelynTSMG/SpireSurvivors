@@ -1,10 +1,10 @@
 package SpireSurvivors.pickups;
 
+import SpireSurvivors.pickups.AbstractPickup.PickupType;
 import basemod.ReflectionHacks;
 import com.badlogic.gdx.math.MathUtils;
 import jdk.internal.vm.annotation.ForceInline;
 import sun.misc.Unsafe;
-import SpireSurvivors.pickups.AbstractPickup.PickupType;
 
 /**
  * Defines methods for interacting with a pickup structure in memory.<br>

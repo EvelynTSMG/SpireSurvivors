@@ -3,7 +3,6 @@ package SpireSurvivors.pickups;
 import SpireSurvivors.dungeon.SurvivorDungeon;
 import SpireSurvivors.entity.AbstractSurvivorPlayer;
 import SpireSurvivors.pickups.AbstractPickup.PickupType;
-import basemod.ReflectionHacks;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
