@@ -136,6 +136,13 @@ public class PickupPool {
         return address;
     }
 
+    public long spawnScatteredLocal(float x, float y, PickupType type, int compression, boolean mayCompress) {
+        x += MathUtils.random(-AbstractPickup.SCATTER_RANGE, AbstractPickup.SCATTER_RANGE);
+        y += MathUtils.random(-AbstractPickup.SCATTER_RANGE, AbstractPickup.SCATTER_RANGE);
+
+        return spawnLocal(x, y, type, compression, mayCompress);
+    }
+
     /**
      * Removes a pickup from the pool.
      * @param address A pointer to the {@link PickupStruct} that should be removed.
