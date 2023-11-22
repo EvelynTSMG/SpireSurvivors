@@ -77,6 +77,7 @@ public class ProgressBar {
     }
 
     public void render(SpriteBatch sb, float x, float y, float scaleX, float scaleY) {
+        sb.setColor(Color.WHITE);
         if (background != null) {
             sb.draw(new TextureRegion(background), x - background.getWidth()/2f, y - background.getHeight()/2f,
                 background.getWidth() / 2f, background.getHeight() / 2f,
