@@ -73,48 +73,49 @@ public class PickupPool {
         // use literally anything that doesn't require getter methods and constantly creating new instances
         // instead of these Pair<Integer, ArrayList<Long>> objects
 
+        final int BUCKET_COUNT = 32;
+
         @SuppressWarnings("unchecked")
-        Pair<Integer, ArrayList<Long>>[] buckets = new Pair[32];
-        for (int i = 0; i < buckets.length; i++) {
-            if (i == compression * AbstractPickup.COMPRESSION_FACTOR) buckets[i] = new Pair<>(1, new ArrayList<>());
-            buckets[i] = new Pair<>(0, new ArrayList<>());
+        ArrayList<Long>[] buckets_pickups = new ArrayList[BUCKET_COUNT];
+        int[] buckets_count = new int[BUCKET_COUNT];
+        for (int i = 0; i < BUCKET_COUNT; i++) {
+            if (i == compression * AbstractPickup.COMPRESSION_FACTOR) buckets_count[i] += 1;
+            buckets_pickups[i] = new ArrayList<>(32);
         }
 
         runForNearby(x, y, AbstractPickup.COMPRESSION_RANGE, address -> {
             if (PickupStruct.type(address) == type) {
-                Pair<Integer, ArrayList<Long>> p = buckets[PickupStruct.compression(address) * AbstractPickup.COMPRESSION_FACTOR];
-                p.getValue().add(address);
-                buckets[PickupStruct.compression(address) * AbstractPickup.COMPRESSION_FACTOR] = new Pair<>(p.getKey() + 1, p.getValue());
+                buckets_pickups[PickupStruct.compression(address) * AbstractPickup.COMPRESSION_FACTOR].add(address);
             }
         });
 
         int goal = (compression + 1) * AbstractPickup.COMPRESSION_FACTOR;
-        int goal_n = buckets[goal].getKey() + 1;
+        int goal_n = buckets_count[goal] + 1;
         int last_goal_reached = 0; // may not be needed?
         int last_goal_n = 0; // may not be needed?
 
-        if (!canAchieveNextCompression(buckets, compression * AbstractPickup.COMPRESSION_FACTOR, 0)) {
+        if (!canAchieveNextCompression(buckets_count, compression * AbstractPickup.COMPRESSION_FACTOR, 0)) {
             // We can't do anything
             return compression;
         }
 
-        for (int i = 0; i < buckets.length; i++) {
+        for (int i = 0; i < BUCKET_COUNT; i++) {
             if (i == goal) {
-                if (buckets[i].getKey() >= goal_n) {
+                if (buckets_count[i] >= goal_n) {
                     last_goal_reached = goal;
                     last_goal_n = goal_n;
 
-                    if (!canAchieveNextCompression(buckets, goal, i)) break;
+                    if (!canAchieveNextCompression(buckets_count, goal, i)) break;
 
                     goal += AbstractPickup.COMPRESSION_FACTOR;
-                    goal_n = buckets[goal].getKey() + 1;
+                    goal_n = buckets_count[goal] + 1;
                 } else break;
             }
-            if (i == buckets.length - 1) break;
+            if (i == BUCKET_COUNT - 1) break;
 
-            int count = buckets[i].getKey();
-            ArrayList<Long> list = buckets[i].getValue();
-            ArrayList<Long> list_next = buckets[i + 1].getValue();
+            int count = buckets_count[i];
+            ArrayList<Long> list = buckets_pickups[i];
+            ArrayList<Long> list_next = buckets_pickups[i + 1];
 
             if (count % 2 == 1) {
                 list_next.addAll(list.subList(1, list.size()));
@@ -127,13 +128,13 @@ public class PickupPool {
                 list.clear();
             }
 
-            buckets[i] = new Pair<>(count % 2, list);
-            buckets[i + 1] = new Pair<>(buckets[i + 1].getKey() + (count/2), list_next);
+            buckets_count[i + 1] += count/2;
+            buckets_count[i] %= 2;
         }
 
-        int extras = buckets[last_goal_reached].getKey() - last_goal_n;
+        int extras = buckets_count[last_goal_reached] - last_goal_n;
 
-        for (long address : buckets[last_goal_reached].getValue()) {
+        for (long address : buckets_pickups[last_goal_reached]) {
             if (PickupStruct.compression(address) != last_goal_reached) {
                 remove(address);
             }
@@ -150,17 +151,17 @@ public class PickupPool {
         return compression;
     }
 
-    private boolean canAchieveNextCompression(Pair<Integer, ArrayList<Long>>[] buckets, int goal, int i) {
+    private boolean canAchieveNextCompression(int[] buckets_count, int goal, int i) {
         // Max compression achieved
         int next_goal = goal + AbstractPickup.COMPRESSION_FACTOR;
-        if (next_goal >= buckets.length) return false;
+        if (next_goal >= buckets_count.length) return false;
 
         // There's not enough to compress further
-        int next_goal_n = buckets[next_goal].getKey() + 1;
+        int next_goal_n = buckets_count[next_goal] + 1;
         int sum = 0;
         for (int j = i; j < next_goal; j++) {
             sum /= 2;
-            sum += buckets[j].getKey();
+            sum += buckets_count[j];
         }
         return sum >= next_goal_n;
     }
