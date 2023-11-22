@@ -134,7 +134,7 @@ public class SurvivorDungeon {
                     float x = m.monster.hb.cX;
                     float y = m.monster.hb.cY;
                     if (m.xpCount > 1) PickupPool.spawnScattered(x, y, AbstractPickup.PickupType.XP, m.xpCompression, false);
-                    else PickupPool.spawn(x, y, AbstractPickup.PickupType.XP, m.xpCompression, false);
+                    else PickupPool.spawn(x, y, AbstractPickup.PickupType.XP, m.xpCompression, true);
                 }
             }
             return m.monster.isDead;
