@@ -41,15 +41,20 @@ public interface PickupBehavior {
     }
 
     /**
-     * Called while the pickup is in the player's pickup pull range and the pickup's NO_PULL flag isn't set.
+     * Called while the pickup is in the player's pickup pull range and the pickup's {@code NO_PULL} flag isn't set.<br>
+     * The first frame the pickup started being pulled, the {@code BEING_PULLED} flag will be false.<br>
+     * The timer of the struct will also not be reset to 0.
      * @param address A pointer to an instance of {@link PickupStruct}.
      */
     default void pull(long address) {
-        // By default, pull directly towards the player at the player's pull speed
+        // By default, pull directly towards the player at the player's pull speed + bonus from pull time
         float dx = SurvivorDungeon.player.basePlayer.hb.cX - PickupStruct.x(address);
         float dy = SurvivorDungeon.player.basePlayer.hb.cY - PickupStruct.y(address);
+        // Double speed every 2s
+        float pullTime = PickupStruct.beingPulled(address) ? PickupStruct.timer(address) : 0;
+        float pullTimeBonus = AbstractSurvivorPlayer.PICKUP_PULL_SPEED * pullTime / 2f;
 
-        Vector2 distance = new Vector2(dx, dy).nor().scl(AbstractSurvivorPlayer.PICKUP_PULL_SPEED);
+        Vector2 distance = new Vector2(dx, dy).nor().scl(AbstractSurvivorPlayer.PICKUP_PULL_SPEED + pullTimeBonus);
         PickupStruct.x(address, PickupStruct.x(address) + distance.x);
         PickupStruct.y(address, PickupStruct.y(address) + distance.y);
     }

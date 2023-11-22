@@ -129,7 +129,7 @@ public class PickupPool {
         PickupStruct.y(address, y);
 
         PickupStruct.scale(address, 1f);
-        PickupStruct.bobTimer(address, MathUtils.random(0, (float)Math.PI * 2));
+        PickupStruct.timer(address, MathUtils.random(0, (float)Math.PI * 2));
 
         PickupStruct.compression(address, compression);
         PickupStruct.flags(address, type.flags);
@@ -496,21 +496,29 @@ public class PickupPool {
             }
 
             // Bobby Pickups
-            if (!PickupStruct.noBob(address)) {
+            if (!PickupStruct.noBob(address) && !PickupStruct.beingPulled(address)) {
                 float bobTimerDelta = Gdx.graphics.getDeltaTime() * PickupStruct.type(address).bobSpeed;
-                PickupStruct.bobTimer(address, PickupStruct.bobTimer(address) + bobTimerDelta);
-                if (PickupStruct.bobTimer(address) > Math.PI * 2) {
+                PickupStruct.timer(address, PickupStruct.timer(address) + bobTimerDelta);
+                if (PickupStruct.timer(address) > Math.PI * 2) {
                     // Preemptively avoiding reaching limits in long runs
-                    PickupStruct.bobTimer(address, PickupStruct.bobTimer(address) - (float)Math.PI * 2);
+                    PickupStruct.timer(address, PickupStruct.timer(address) - (float)Math.PI * 2);
                 }
 
             }
 
             // Try to pull towards player
-            if (!PickupStruct.noPull(address)) {
-                if (dx*dx + dy*dy <= pullRange) {
-                    PickupStruct.type(address).pull(address);
+            if (!PickupStruct.noPull(address) && dx*dx + dy*dy <= pullRange) {
+                PickupStruct.type(address).pull(address);
+
+                if (PickupStruct.beingPulled(address)) {
+                    PickupStruct.timer(address, PickupStruct.timer(address) + Gdx.graphics.getDeltaTime());
+                } else {
+                    PickupStruct.beingPulled(address, true);
+                    PickupStruct.timer(address, 0);
                 }
+            } else {
+                PickupStruct.beingPulled(address, false);
+                PickupStruct.timer(address, 0);
             }
         });
     }

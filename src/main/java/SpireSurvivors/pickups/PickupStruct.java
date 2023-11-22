@@ -29,13 +29,14 @@ public final class PickupStruct {
     private final static int OFFSET_Y = 0x4;
     private final static int OFFSET_SCALE = 0x8;
     private final static int OFFSET_ROT = 0xC;
-    private final static int OFFSET_BOB_TIMER = 0x10;
+    private final static int OFFSET_TIMER = 0x10;
     private final static int OFFSET_TYPE = 0x14;
     private final static int OFFSET_COMPRESSION = 0x18;
     private final static int OFFSET_FLAGS = 0x1C;
         public final static int FLAG_NO_PULL = 1;
         public final static int FLAG_NO_BOB = 1 << 1;
-        public final static int FLAG_PERSISTENT = 1 << 2;
+        public final static int FLAG_BEING_PULLED = 1 << 2;
+        public final static int FLAG_PERSISTENT = 1 << 3;
 
     /**
      * Allocates memory for a {@code PickupStruct}.<br>
@@ -157,23 +158,23 @@ public final class PickupStruct {
     }
 
     /**
-     * Returns the bob timer of the pickup located at {@code baseAddress}.
+     * Returns the timer of the pickup located at {@code baseAddress}.
      * @param baseAddress A pointer to an instance of {@code PickupStruct}.
-     * @return The bob timer of the pickup.
+     * @return The timer of the pickup.
      */
     @ForceInline
-    public static float bobTimer(long baseAddress) {
-        return unsafe.getFloat(baseAddress + OFFSET_BOB_TIMER);
+    public static float timer(long baseAddress) {
+        return unsafe.getFloat(baseAddress + OFFSET_TIMER);
     }
 
     /**
-     * Sets the bob timer of the pickup located at {@code baseAddress} to {@code value}.
+     * Sets the timer of the pickup located at {@code baseAddress} to {@code value}.
      * @param baseAddress A pointer to an instance of {@code PickupStruct}.
-     * @param value The value to set the bob timer to.
+     * @param value The value to set the timer to.
      */
     @ForceInline
-    public static void bobTimer(long baseAddress, float value) {
-        unsafe.putFloat(baseAddress + OFFSET_BOB_TIMER, value);
+    public static void timer(long baseAddress, float value) {
+        unsafe.putFloat(baseAddress + OFFSET_TIMER, value);
     }
 
     /**
@@ -306,6 +307,28 @@ public final class PickupStruct {
     }
 
     /**
+     * Returns whether the pickup located at {@code baseAddress} is being pulled.
+     * @param baseAddress A pointer to an instance of {@code PickupStruct}.
+     * @return Whether the pickup is being pulled.
+     */
+    @ForceInline
+    public static boolean beingPulled(long baseAddress) {
+        return (unsafe.getInt(baseAddress + OFFSET_FLAGS) & FLAG_BEING_PULLED) != 0;
+    }
+
+    /**
+     * Sets whether the pickup located at {@code baseAddress} is being pulled.
+     * @param baseAddress A pointer to an instance of {@code PickupStruct}.
+     * @param value Whether the pickup is being pulled.
+     */
+    @ForceInline
+    public static void beingPulled(long baseAddress, boolean value) {
+        int x = unsafe.getInt(baseAddress + OFFSET_FLAGS);
+        x = value ? x | FLAG_BEING_PULLED : x & ~FLAG_BEING_PULLED;
+        unsafe.putInt(baseAddress + OFFSET_FLAGS, x);
+    }
+
+    /**
      * Returns whether the pickup located at {@code baseAddress} persists after being touched.<br>
      * If {@code true}, the pickup won't be collected.
      * @param baseAddress A pointer to an instance of {@code PickupStruct}.
@@ -345,7 +368,7 @@ public final class PickupStruct {
      */
     @ForceInline
     public static float drawY(long baseAddress, float bobDistance) {
-        return PickupStruct.y(baseAddress) + MathUtils.sin(PickupStruct.bobTimer(baseAddress)) * bobDistance;
+        return PickupStruct.y(baseAddress) + MathUtils.sin(PickupStruct.timer(baseAddress)) * bobDistance;
     }
 
     /**
