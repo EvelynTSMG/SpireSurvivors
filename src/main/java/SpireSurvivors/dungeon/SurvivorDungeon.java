@@ -6,9 +6,7 @@ import SpireSurvivors.entity.AbstractSurvivorMonster;
 import SpireSurvivors.entity.AbstractSurvivorPlayer;
 import SpireSurvivors.patches.CardCrawlGamePatches;
 import SpireSurvivors.pickups.AbstractPickup;
-import SpireSurvivors.pickups.AbstractSurvivorInteractable;
 import SpireSurvivors.pickups.PickupPool;
-import SpireSurvivors.pickups.XPPickup;
 import SpireSurvivors.screens.survivorGame.SurvivorChoiceScreen;
 import SpireSurvivors.screens.survivorGame.SurvivorPauseScreen;
 import SpireSurvivors.ui.SurvivorUI;
@@ -105,18 +103,6 @@ public class SurvivorDungeon {
         pickupPools.add(new PickupPool());
     }
 
-    public long spawnPickup(float x, float y, AbstractPickup.PickupType type, int compression, boolean shouldCompress) {
-        for (PickupPool pool : pickupPools) {
-            if (!pool.isFull()) {
-                return pool.spawn(x, y, type, compression, shouldCompress);
-            }
-        }
-
-        // All pools must be full, so we add one more
-        pickupPools.add(new PickupPool());
-        return pickupPools.get(pickupPools.size() - 1).spawn(x, y, type, compression, shouldCompress);
-    }
-
     public void update() {
         if (player.rewards > 0) {
             survivorChoiceScreen.open(false);
@@ -147,11 +133,8 @@ public class SurvivorDungeon {
                 for (int i = 0; i < m.xpCount; i++) {
                     float x = m.monster.hb.cX;
                     float y = m.monster.hb.cY;
-                    if (m.xpCount > 1) {
-                        x += MathUtils.random(-AbstractPickup.SCATTER_RANGE, AbstractPickup.SCATTER_RANGE);
-                        y += MathUtils.random(-AbstractPickup.SCATTER_RANGE, AbstractPickup.SCATTER_RANGE);
-                    }
-                    spawnPickup(x, y, AbstractPickup.PickupType.XP, m.xpCompression, false);
+                    if (m.xpCount > 1) PickupPool.spawnScattered(x, y, AbstractPickup.PickupType.XP, m.xpCompression, false);
+                    else PickupPool.spawn(x, y, AbstractPickup.PickupType.XP, m.xpCompression, false);
                 }
             }
             return m.monster.isDead;
@@ -172,9 +155,7 @@ public class SurvivorDungeon {
         }
         effects.removeIf(e -> e.isDone);
 
-        for (PickupPool pool : pickupPools) {
-            pool.update();
-        }
+        PickupPool.update();
 
         if (player.basePlayer.isDead) {
             CardCrawlGame.startOver();
@@ -222,9 +203,7 @@ public class SurvivorDungeon {
         for (AbstractSurvivorMonster m : monsters) {
             m.move(-dir.x, -dir.y);
         }
-        for (PickupPool pool : pickupPools) {
-            pool.move(-dir.x, -dir.y);
-        }
+        PickupPool.move(-dir.x, -dir.y);
         worldX += dir.x;
         worldY += dir.y;
         camera.translate(dir);
@@ -238,9 +217,7 @@ public class SurvivorDungeon {
         mapRenderer.render();
         sb.begin();
 
-        for (PickupPool pool : pickupPools) {
-            pool.render(sb);
-        }
+        PickupPool.render(sb);
 
         for (AbstractSurvivorMonster m : monsters) {
             if (m.monster.hb.cY <= Settings.HEIGHT/2f) {

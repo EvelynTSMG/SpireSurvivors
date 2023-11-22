@@ -3,7 +3,6 @@ package SpireSurvivors.pickups;
 import SpireSurvivors.dungeon.SurvivorDungeon;
 import SpireSurvivors.entity.AbstractSurvivorPlayer;
 import SpireSurvivors.pickups.AbstractPickup.PickupType;
-import basemod.Pair;
 import basemod.ReflectionHacks;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.Texture;
@@ -11,11 +10,12 @@ import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.math.MathUtils;
 import com.megacrit.cardcrawl.core.Settings;
-import sun.misc.Unsafe;
 
 import java.util.ArrayList;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
+
+import static SpireSurvivors.dungeon.SurvivorDungeon.pickupPools;
 
 /**
  * Defines and manages a pool of pickups
@@ -23,28 +23,101 @@ import java.util.function.Predicate;
  * @see AbstractPickup
  */
 public class PickupPool {
-    private final static Unsafe unsafe = ReflectionHacks.getPrivateStatic(Unsafe.class, "theUnsafe");
+    /**
+     * The amount of pickups the pool can store.
+     */
     public final static int POOL_SIZE = 1024;
+    /**
+     * A pointer to the start of the pool
+     */
     private final long poolAddress;
+    /**
+     * The amount of active pickups currently in the pool
+     */
     private int usedPickups = 0;
 
     public PickupPool() {
-        poolAddress = unsafe.allocateMemory(POOL_SIZE * PickupStruct.SIZE);
+        poolAddress = PickupStruct.allocMany(POOL_SIZE);
 
         // We have to set everything to Inactive so we don't accidentally clog
-        long address = poolAddress + (int)ReflectionHacks.getPrivateStatic(PickupStruct.class, "OFFSET_TYPE");
+        long address = poolAddress;
         for (int i = 0; i < POOL_SIZE; i++, address += PickupStruct.SIZE) {
-            // Serializing kinda slow, so we do it manually :3
-            unsafe.putInt(address, 0);
+            PickupStruct.deactivate(address);
         }
     }
 
+    // Deprecated in Java 9+, we're in Java 8
+    // Also there isn't a better way (that's not to say this way is good)
+    @Override
+    @SuppressWarnings("removal")
+    protected void finalize() {
+        // Gotta make sure we don't leak memory!
+        PickupStruct.free(poolAddress);
+    }
+
+    /*===== Basic Functionality =====*/
+
+    /**
+     * @return Whether the pool is full
+     */
     public boolean isFull() {
         return usedPickups >= POOL_SIZE;
     }
 
-    public long spawn(float x, float y, PickupType type, int compression, boolean shouldCompress) {
-        if (shouldCompress) compression = tryCompress(x, y, type, compression);
+    /**
+     * Spawn a pickup of {@code type} at ({@code x}, {@code y}) with the given {@code compression}.<br>
+     * If {@code mayCompress} is {@code true}, it may attempt to compress the spawned pickup using {@link PickupPool#tryCompress(float, float, PickupType, int) tryCompress()}.
+     * @param x The x coordinate where the pickup should spawn.
+     * @param y The y coordinate where the pickup should spawn.
+     * @param type The type of the pickup to spawn.
+     * @param compression The compression level of the pickup to spawn.
+     * @param mayCompress Whether the pool is allowed to make a compression attempt.<br>
+     *                    Respects {@link PickupType#compressable type.compressable} regardless.
+     * @return The address of the spawned pickup.
+     */
+    public static long spawn(float x, float y, PickupType type, int compression, boolean mayCompress) {
+        for (PickupPool pool : pickupPools) {
+            if (!pool.isFull()) {
+                return pool.spawnLocal(x, y, type, compression, mayCompress);
+            }
+        }
+
+        // All pools must be full, so we add one more
+        pickupPools.add(new PickupPool());
+        return pickupPools.get(pickupPools.size() - 1).spawnLocal(x, y, type, compression, mayCompress);
+    }
+
+    /**
+     * Spawn a pickup of {@code type} at a random position near ({@code x}, {@code y}) with the given {@code compression}.<br>
+     * If {@code mayCompress} is {@code true}, it may attempt to compress the spawned pickup using {@link PickupPool#tryCompress(float, float, PickupType, int) tryCompress()}.
+     * @param x The x coordinate where the pickup should spawn.
+     * @param y The y coordinate where the pickup should spawn.
+     * @param type The type of the pickup to spawn.
+     * @param compression The compression level of the pickup to spawn.
+     * @param mayCompress Whether the pool is allowed to make a compression attempt.<br>
+     *                    Respects {@link PickupType#compressable type.compressable} regardless.
+     * @return The address of the spawned pickup.
+     */
+    public static long spawnScattered(float x, float y, PickupType type, int compression, boolean mayCompress) {
+        x += MathUtils.random(-AbstractPickup.SCATTER_RANGE, AbstractPickup.SCATTER_RANGE);
+        y += MathUtils.random(-AbstractPickup.SCATTER_RANGE, AbstractPickup.SCATTER_RANGE);
+
+        return spawn(x, y, type, compression, mayCompress);
+    }
+
+    /**
+     * Spawn a pickup of {@code type} at ({@code x}, {@code y}) with the given {@code compression} in this pool.<br>
+     * If {@code mayCompress} is {@code true}, it may attempt to compress the spawned pickup using {@link PickupPool#tryCompress(float, float, PickupType, int) tryCompress()}.
+     * @param x The x coordinate where the pickup should spawn.
+     * @param y The y coordinate where the pickup should spawn.
+     * @param type The type of the pickup to spawn.
+     * @param compression The compression level of the pickup to spawn.
+     * @param mayCompress Whether the pool is allowed to make a compression attempt.<br>
+     *                    Respects {@link PickupType#compressable type.compressable} regardless.
+     * @return The address of the spawned pickup.
+     */
+    public long spawnLocal(float x, float y, PickupType type, int compression, boolean mayCompress) {
+        if (type.compressable && mayCompress) compression = tryCompress(x, y, type, compression);
 
         long address = getInactive();
         PickupStruct.clear(address);
@@ -63,16 +136,35 @@ public class PickupPool {
         return address;
     }
 
+    /**
+     * Removes a pickup from the pool.
+     * @param address A pointer to the {@link PickupStruct} that should be removed.
+     */
     public void remove(long address) {
-        PickupStruct.type(address, PickupType.INACTIVE);
+        PickupStruct.deactivate(address);
         usedPickups -= 1;
     }
 
-    public int tryCompress(float x, float y, PickupType type, int compression) {
-        // How to optimize:
-        // use literally anything that doesn't require getter methods and constantly creating new instances
-        // instead of these Pair<Integer, ArrayList<Long>> objects
+    /**
+     * Returns a pointer to the first inactive {@link PickupStruct} in this pool.
+     * @return A pointer to a {@link PickupStruct}.
+     */
+    private long getInactive() {
+        long baseAddress = poolAddress;
+        for (int i = 0; i < POOL_SIZE; i++, baseAddress += PickupStruct.SIZE) {
+            if (!PickupStruct.active(baseAddress)) {
+                return baseAddress;
+            }
+        }
 
+        // Unreachable
+        throw new OutOfMemoryError("Pickup Pool out of inactive slots");
+    }
+
+
+    /*===== Compression =====*/
+
+    public int tryCompress(float x, float y, PickupType type, int compression) {
         final int BUCKET_COUNT = 32;
 
         @SuppressWarnings("unchecked")
@@ -132,8 +224,6 @@ public class PickupPool {
             buckets_count[i] %= 2;
         }
 
-        int extras = buckets_count[last_goal_reached] - last_goal_n;
-
         for (long address : buckets_pickups[last_goal_reached]) {
             if (PickupStruct.compression(address) != last_goal_reached) {
                 remove(address);
@@ -142,10 +232,14 @@ public class PickupPool {
         compression = last_goal_reached / AbstractPickup.COMPRESSION_FACTOR;
 
         // Spawn collateral
-        for (int i = 0; i < extras; i++) {
+        int collateral = buckets_count[last_goal_reached] - last_goal_n;
+        for (int i = 0; i < collateral; i++) {
             float extraX = x + MathUtils.random(-AbstractPickup.SCATTER_RANGE, AbstractPickup.SCATTER_RANGE);
             float extraY = y + MathUtils.random(-AbstractPickup.SCATTER_RANGE, AbstractPickup.SCATTER_RANGE);
-            spawn(extraX, extraY, type, compression, false);
+
+            // During compression we'll always remove more pickups than we'll spawn extras
+            // So we can use the pool's local spawn method
+            spawnLocal(extraX, extraY, type, compression, false);
         }
 
         return compression;
@@ -166,8 +260,77 @@ public class PickupPool {
         return sum >= next_goal_n;
     }
 
-    public void runForNearby(float x, float y, float r, Consumer<Long> action) {
-        forEach(address -> {
+
+    /*====== ITERATION ======*/
+
+    /**
+     * Calls {@code action} for all pickups within a circle with radius {@code r} at position ({@code x}, {@code y}).
+     * @param x The x coordinate of the center of the circle.
+     * @param y The y coordinate of the center of the circle.
+     * @param r The radius of the circle.
+     * @param action The action to perform.<br>
+     *               Takes a pointer to a {@link PickupStruct}.
+     * @see PickupPool#runForNearbyLocal(float, float, float, Consumer) runForNearbyLocal()
+     */
+    public static void runForNearby(float x, float y, float r, Consumer<Long> action) {
+        pickupPools.forEach(
+            pool -> pool.runForNearbyLocal(x, y, r, action)
+        );
+    }
+
+    /**
+     * Returns a list of pointers to all pickups within a circle with radius {@code r} at position ({@code x}, {@code y}).
+     * @param x The x coordinate of the center of the circle.
+     * @param y The y coordinate of the center of the circle.
+     * @param r The radius of the circle.
+     * @return ArrayList&lt;{@link PickupStruct}*&gt;.
+     * @see PickupPool#nearbyLocal(float, float, float) nearby()
+     */
+    public static ArrayList<Long> nearby(float x, float y, float r) {
+        return nearby(x, y, r, __ -> true);
+    }
+
+    /**
+     * Returns a filtered list of pointers to all pickups within a circle with radius {@code r} at position ({@code x}, {@code y}).
+     * @param x The x coordinate of the center of the circle.
+     * @param y The y coordinate of the center of the circle.
+     * @param r The radius of the circle.
+     * @param filter The filter that determines whether a given pickup will be added to a list.<br>
+     *               Takes in a pointer to a {@link PickupStruct}.
+     * @return ArrayList&lt;{@link PickupStruct}*&gt;.
+     * @see PickupPool#nearbyLocal(float, float, float, Predicate) nearbyLocal()
+     */
+    public static ArrayList<Long> nearby(float x, float y, float r, Predicate<Long> filter) {
+        ArrayList<Long> pickups = new ArrayList<>();
+        pickupPools.forEach(
+            pool -> pickups.addAll(pool.nearbyLocal(x, y, r, filter))
+        );
+        return pickups;
+    }
+
+    /**
+     * Calls {@code action} for all pickups.
+     * @param action The action to perform.<br>
+     *               Takes a pointer to a {@link PickupStruct}
+     * @see PickupPool#forEachLocal(Consumer) forEachLocal()
+     */
+    public static void forEach(Consumer<Long> action) {
+        pickupPools.forEach(
+            pool -> pool.forEachLocal(action)
+        );
+    }
+
+    /**
+     * Calls {@code action} for pickups in this pool within a circle with radius {@code r} at position ({@code x}, {@code y}).
+     * @param x The x coordinate of the center of the circle.
+     * @param y The y coordinate of the center of the circle.
+     * @param r The radius of the circle.
+     * @param action The action to perform.<br>
+     *               Takes a pointer to a {@link PickupStruct}.
+     * @see PickupPool#runForNearby(float, float, float, Consumer) runForNearby()
+     */
+    public void runForNearbyLocal(float x, float y, float r, Consumer<Long> action) {
+        forEachLocal(address -> {
             float dx = PickupStruct.x(address) - x;
             float dy = PickupStruct.y(address) - y;
             if (dx*dx + dy*dy <= r*r) {
@@ -176,21 +339,32 @@ public class PickupPool {
         });
     }
 
-    public ArrayList<Long> nearby(float x, float y, float r) {
-        ArrayList<Long> pickups = new ArrayList<>();
-        forEach(address -> {
-            float dx = PickupStruct.x(address) - x;
-            float dy = PickupStruct.y(address) - y;
-            if (dx*dx + dy*dy <= r*r) {
-                pickups.add(address);
-            }
-        });
-        return pickups;
+    /**
+     * Returns a list of pointers to pickups in this pool within a circle with radius {@code r} at position ({@code x}, {@code y}).
+     * @param x The x coordinate of the center of the circle.
+     * @param y The y coordinate of the center of the circle.
+     * @param r The radius of the circle.
+     * @return ArrayList&lt;{@link PickupStruct}*&gt;.
+     * @see PickupPool#nearby(float, float, float) nearby()
+     */
+    public ArrayList<Long> nearbyLocal(float x, float y, float r) {
+        // Negligibly suboptimal
+        return nearbyLocal(x, y, r, __ -> true);
     }
 
-    public ArrayList<Long> nearby(float x, float y, float r, Predicate<Long> filter) {
+    /**
+     * Returns a filtered list of pointers to pickups in this pool within a circle with radius {@code r} at position ({@code x}, {@code y}).
+     * @param x The x coordinate of the center of the circle.
+     * @param y The y coordinate of the center of the circle.
+     * @param r The radius of the circle.
+     * @param filter The filter that determines whether a given pickup will be added to a list.<br>
+     *               Takes in a pointer to a {@link PickupStruct}.
+     * @return ArrayList&lt;{@link PickupStruct}*&gt;.
+     * @see PickupPool#nearby(float, float, float, Predicate) nearby()
+     */
+    public ArrayList<Long> nearbyLocal(float x, float y, float r, Predicate<Long> filter) {
         ArrayList<Long> pickups = new ArrayList<>();
-        forEach(address -> {
+        forEachLocal(address -> {
             float dx = PickupStruct.x(address) - x;
             float dy = PickupStruct.y(address) - y;
             if (dx*dx + dy*dy <= r*r && filter.test(address)) {
@@ -200,35 +374,66 @@ public class PickupPool {
         return pickups;
     }
 
-    private long getInactive() {
+    /**
+     * Calls {@code action} for pickups in this pool.
+     * @param action The action to perform.<br>
+     *               Takes a pointer to a {@link PickupStruct}
+     * @see PickupPool#forEach(Consumer) forEach()
+     */
+    public void forEachLocal(Consumer<Long> action) {
         long baseAddress = poolAddress;
         for (int i = 0; i < POOL_SIZE; i++, baseAddress += PickupStruct.SIZE) {
-            if (PickupStruct.type(baseAddress) == PickupType.INACTIVE) {
-                return baseAddress;
-            }
-        }
-
-        // Unreachable
-        throw new OutOfMemoryError("Pickup Pool out of inactive slots");
-    }
-
-    public void forEach(Consumer<Long> action) {
-        long baseAddress = poolAddress;
-        for (int i = 0; i < POOL_SIZE; i++, baseAddress += PickupStruct.SIZE) {
-            if (PickupStruct.type(baseAddress) != PickupType.INACTIVE) {
+            if (PickupStruct.active(baseAddress)) {
                 action.accept(baseAddress);
             }
         }
     }
 
-    public void update() {
+
+    /*===== POOL HANDLING =====*/
+
+    /**
+     * Updates all pickups. Should only be called once per frame.
+     * @see PickupPool#updateLocal()
+     */
+    public static void update() {
+        pickupPools.forEach(PickupPool::updateLocal);
+    }
+
+    /**
+     * Renders all pickups onto {@code sb}.
+     * @param sb The {@link SpriteBatch} to draw onto.
+     */
+    public static void render(SpriteBatch sb) {
+        pickupPools.forEach(
+            pool -> pool.renderLocal(sb)
+        );
+    }
+
+    /**
+     * Moves all pickups by the vector [{@code x}, {@code y}].
+     * @param x The x coordinate to move by.
+     * @param y The y coordinate to move by.
+     */
+    public static void move(float x, float y) {
+        pickupPools.forEach(
+            pool -> pool.moveLocal(x, y)
+        );
+    }
+
+    /**
+     * Updates pickups in this pool. Should only be called once per frame.
+     * @see PickupPool#update()
+     */
+    public void updateLocal() {
+        // Store some variables for all pickups instead of recalculating or re-accessing them every time
         float playerX = SurvivorDungeon.player.basePlayer.hb.cX;
         float playerY = SurvivorDungeon.player.basePlayer.hb.cY;
 
         double pullRange = Math.pow(SurvivorDungeon.player.pickupRangeMultiplier * AbstractSurvivorPlayer.PICKUP_PULL_RANGE, 2);
         double collectRange = Math.pow(AbstractSurvivorPlayer.PICKUP_COLLECT_RANGE, 2);
 
-        forEach(address -> {
+        forEachLocal(address -> {
             float dx = PickupStruct.x(address) - playerX;
             float dy = PickupStruct.y(address) - playerY;
 
@@ -264,8 +469,12 @@ public class PickupPool {
         });
     }
 
-    public void render(SpriteBatch sb) {
-        forEach(address -> {
+    /**
+     * Renders pickups in this pool onto {@code sb}.
+     * @param sb The {@link SpriteBatch} to draw onto.
+     */
+    public void renderLocal(SpriteBatch sb) {
+        forEachLocal(address -> {
             PickupType type = PickupStruct.type(address);
             if (type.image != null) {
                 Texture t = type.image.getTexture();
@@ -278,8 +487,13 @@ public class PickupPool {
         });
     }
 
-    public void move(float x, float y) {
-        forEach(address -> {
+    /**
+     * Moves pickups in this pool by the vector [{@code x}, {@code y}].
+     * @param x The x coordinate to move by.
+     * @param y The y coordinate to move by.
+     */
+    public void moveLocal(float x, float y) {
+        forEachLocal(address -> {
             PickupStruct.x(address, PickupStruct.x(address) + x);
             PickupStruct.y(address, PickupStruct.y(address) + y);
         });

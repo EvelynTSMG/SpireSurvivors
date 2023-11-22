@@ -15,17 +15,36 @@ import java.util.Map;
  * @see PickupStruct
  */
 public class AbstractPickup {
-    // Compression combines 2^COMPRESSION_FACTOR pickups of the same type into one pickup
+    /**
+     * Compression combines 2<sup>{@code COMPRESSION_FACTOR}</sup> pickups of the same type into one pickup
+     */
     public final static int COMPRESSION_FACTOR = 3;
-    // Compression will attempt to find enough items within COMPRESSION_RANGE radius
+    /**
+     * Compression will attempt to find enough items within {@code COMPRESSION_RANGE} radius
+     */
     public final static float COMPRESSION_RANGE = 20f;
-    // Compression may compress extra pickups and put them within COMPRESSION_SPAWN_RANGE radius
-    // Can also be to scatter pickups on spawn
+    /**
+     * Compression may compress additional pickups and spawn them within {@code SCATTER_RANGE} radius
+     * of the original pickup the compression targeted.<br>
+     * Can also be used to scatter pickups on spawn.
+     */
     public final static float SCATTER_RANGE = 30f;
 
+
+    /**
+     * Returns the value of the pickup with a compression level of {@code compression}.
+     * @param compression The compression level.
+     * @return The value of a pickup at the given compression level.
+     */
+    public static int value(int compression) {
+        return 1 << (compression * COMPRESSION_FACTOR);
+    }
+
+    /**
+     * Defines different types of enums, including behavior and type-dependant properties like {@code image} and default {@code flags}.
+     */
     public enum PickupType implements PickupBehavior {
-        INACTIVE(0),
-        XP(1, ImageMaster.SCROLL_BAR_TRAIN, 10f, 4f, 0) {
+        XP(1, ImageMaster.SCROLL_BAR_TRAIN, 10f, 4f, true, 0) {
             public void onCollect(long address) {
                 SurvivorDungeon.player.gainXP(PickupStruct.value(address));
             }
@@ -35,27 +54,28 @@ public class AbstractPickup {
         public final TextureRegion image;
         public final float bobDistance;
         public final float bobSpeed;
+        public final boolean compressable;
         public final int flags;
 
         static final Map<Integer, PickupType> map = new HashMap<>();
 
-        PickupType(int id) {
-            this(id, (TextureRegion)null, 0, 0, 0);
-        }
-
-        PickupType(int id, Texture texture, float bobDistance, float bobSpeed, int flags) {
+        PickupType(int id, Texture texture, float bobDistance, float bobSpeed, boolean compressable, int flags) {
+            if (id == 0) throw new IllegalArgumentException("PickupType id cannot be 0");
             this.id = id;
             this.bobDistance = bobDistance;
             this.bobSpeed = bobSpeed;
+            this.compressable = compressable;
             this.flags = flags;
 
             this.image = new TextureRegion(texture);
         }
 
-        PickupType(int id, TextureRegion region, float bobDistance, float bobSpeed, int flags) {
+        PickupType(int id, TextureRegion region, float bobDistance, float bobSpeed, boolean compressable, int flags) {
+            if (id == 0) throw new IllegalArgumentException("PickupType id cannot be 0");
             this.id = id;
             this.bobDistance = bobDistance;
             this.bobSpeed = bobSpeed;
+            this.compressable = compressable;
             this.flags = flags;
 
             this.image = region;
@@ -73,6 +93,18 @@ public class AbstractPickup {
 
         public static int serialize(PickupType type) {
             return type.id;
+        }
+
+        public boolean noPull() {
+            return (flags & PickupStruct.FLAG_NO_PULL) != 0;
+        }
+
+        public boolean noBob() {
+            return (flags & PickupStruct.FLAG_NO_BOB) != 0;
+        }
+
+        public boolean persistent() {
+            return (flags & PickupStruct.FLAG_PERSISTENT) != 0;
         }
     }
 }
