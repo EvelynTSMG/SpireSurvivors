@@ -177,6 +177,7 @@ public class PickupPool {
 
         runForNearby(x, y, AbstractPickup.COMPRESSION_RANGE, address -> {
             if (PickupStruct.type(address) == type) {
+                buckets_count[PickupStruct.compression(address) * AbstractPickup.COMPRESSION_FACTOR] += 1;
                 buckets_pickups[PickupStruct.compression(address) * AbstractPickup.COMPRESSION_FACTOR].add(address);
             }
         });
