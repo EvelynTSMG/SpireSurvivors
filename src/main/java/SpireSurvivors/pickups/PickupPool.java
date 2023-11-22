@@ -191,8 +191,6 @@ public class PickupPool {
 
         int goal = (compression + 1) * AbstractPickup.COMPRESSION_FACTOR;
         int goal_n = buckets_count[goal] + 1;
-        int last_goal_reached = 0; // may not be needed?
-        int last_goal_n = 0; // may not be needed?
 
         if (!canAchieveNextCompression(buckets_count, compression * AbstractPickup.COMPRESSION_FACTOR, 0)) {
             // We can't do anything
@@ -202,9 +200,7 @@ public class PickupPool {
         for (int i = 0; i < BUCKET_COUNT; i++) {
             if (i == goal) {
                 if (buckets_count[i] >= goal_n) {
-                    last_goal_reached = goal;
-                    last_goal_n = goal_n;
-
+                    // If we can't achieve the next goal, we're done
                     if (!canAchieveNextCompression(buckets_count, goal, i)) break;
 
                     goal += AbstractPickup.COMPRESSION_FACTOR;
@@ -215,16 +211,15 @@ public class PickupPool {
 
             int count = buckets_count[i];
             ArrayList<Long> list = buckets_pickups[i];
-            ArrayList<Long> list_next = buckets_pickups[i + 1];
 
             if (count % 2 == 1) {
-                list_next.addAll(list.subList(1, list.size()));
+                buckets_pickups[i + 1].addAll(list.subList(1, list.size()));
 
                 long first = list.get(0);
                 list.clear();
                 list.add(first);
             } else {
-                list_next.addAll(list);
+                buckets_pickups[i + 1].addAll(list);
                 list.clear();
             }
 
@@ -232,15 +227,19 @@ public class PickupPool {
             buckets_count[i] %= 2;
         }
 
-        for (long address : buckets_pickups[last_goal_reached]) {
-            if (PickupStruct.compression(address) != last_goal_reached) {
+        // Remove all pickups that didn't start at our achieved compression level
+        // - the purpose of buckets_pickups realized
+        for (long address : buckets_pickups[goal]) {
+            if (PickupStruct.compression(address) != goal) {
                 remove(address);
             }
         }
-        compression = last_goal_reached / AbstractPickup.COMPRESSION_FACTOR;
+
+        // Convert back to valid compression (2^COMPRESSION_FACTOR-inary instead of binary)
+        compression = goal / AbstractPickup.COMPRESSION_FACTOR;
 
         // Spawn collateral
-        int collateral = buckets_count[last_goal_reached] - last_goal_n;
+        int collateral = buckets_count[goal] - goal_n;
         for (int i = 0; i < collateral; i++) {
             float extraX = x + MathUtils.random(-AbstractPickup.SCATTER_RANGE, AbstractPickup.SCATTER_RANGE);
             float extraY = y + MathUtils.random(-AbstractPickup.SCATTER_RANGE, AbstractPickup.SCATTER_RANGE);
