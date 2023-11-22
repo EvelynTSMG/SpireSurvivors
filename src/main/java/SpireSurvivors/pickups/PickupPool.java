@@ -523,6 +523,10 @@ public class PickupPool {
         forEachLocal(address -> {
             PickupType type = PickupStruct.type(address);
             if (type.image != null) {
+                if (type.compressable) {
+                    AbstractPickup.setColorForCompression(sb, PickupStruct.compression(address));
+                }
+
                 Texture t = type.image.getTexture();
                 sb.draw(new TextureRegion(type.image), PickupStruct.x(address), PickupStruct.drawY(address, type.bobDistance),
                         t.getWidth()/2f, t.getHeight()/2f,
