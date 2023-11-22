@@ -537,7 +537,7 @@ public class PickupPool {
                 // If the pickup doesn't have any initial rotation, can be pulled and is in the player's pull range
                 if (rotation == 0 && !PickupStruct.noPull(address) && dx*dx + dy*dy <= pullRange*pullRange) {
                     // Rotate depending on how far away from the player the pickup is
-                    rotation = (1f - dx/pullRange) * AbstractPickup.PULL_ROTATION;
+                    rotation = (1f - Math.abs(dx)/pullRange) * AbstractPickup.PULL_ROTATION;
                     if (dx > 0) rotation *= -1;
                 }
 
