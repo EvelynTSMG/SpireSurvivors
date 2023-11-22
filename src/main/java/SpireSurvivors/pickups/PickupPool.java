@@ -241,12 +241,9 @@ public class PickupPool {
         // Spawn collateral
         int collateral = buckets_count[goal] - goal_n;
         for (int i = 0; i < collateral; i++) {
-            float extraX = x + MathUtils.random(-AbstractPickup.SCATTER_RANGE, AbstractPickup.SCATTER_RANGE);
-            float extraY = y + MathUtils.random(-AbstractPickup.SCATTER_RANGE, AbstractPickup.SCATTER_RANGE);
-
-            // During compression we'll always remove more pickups than we'll spawn extras
+            // During compression we'll always remove more pickups than we'll compress extras
             // So we can use the pool's local spawn method
-            spawnLocal(extraX, extraY, type, compression, false);
+            spawnScatteredLocal(x, y, type, compression, false);
         }
 
         return compression;
