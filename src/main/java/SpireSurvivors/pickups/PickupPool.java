@@ -171,9 +171,34 @@ public class PickupPool {
 
     /*===== Compression =====*/
 
+    /**
+     * Attempts to compress a potential pickup spawn at ({@code x}, {@code y}) of {@code type}
+     * with an initial compression of {@code compression}.
+     * @param x The x coordinate of the potential pickup spawn
+     * @param y The y coordinate of the potential pickup spawn
+     * @param type The type of of the potential pickup spawn
+     * @param compression The initial compression of the pickup
+     * @return The new compression the pickup should use.
+     */
     public int tryCompress(float x, float y, PickupType type, int compression) {
         final int BUCKET_COUNT = 32;
 
+        /*
+         * buckets_pickups is only here to maintain a list of pickups to remove after we manage to compress them
+         * buckets_count[n] stores the amount of pickups we could achieve at compression level n,
+         *                  regardless of whether it's valid (2^{COMPRESSION_FACTOR * k}) or not
+         * Example changes of buckets_count with BUCKET_COUNT = 8 over the run of this function:
+         *          v Goal, goal_n = 2
+         * [ 0| 2| 0| 0| 1| 0| 0|27]
+         * [ 0| 2| 0| 0| 1| 0|13| 1]
+         *                   +13 %2
+         * [ 0| 2| 0| 0| 1| 6| 1| 1]
+         *                 +6 %2
+         * [ 0| 2| 0| 0| 3| 0| 1| 1]
+         *              +2 %2
+         * And done. In the above example, we're able to reach only our first goal.
+         * We also compress one (1) pickup extra as collateral.
+         */
         @SuppressWarnings("unchecked")
         ArrayList<Long>[] buckets_pickups = new ArrayList[BUCKET_COUNT];
         int[] buckets_count = new int[BUCKET_COUNT];
@@ -182,6 +207,7 @@ public class PickupPool {
             buckets_pickups[i] = new ArrayList<>(32);
         }
 
+        // Add nearby pickups to buckets
         runForNearby(x, y, AbstractPickup.COMPRESSION_RANGE, address -> {
             if (PickupStruct.type(address) == type) {
                 buckets_count[PickupStruct.compression(address) * AbstractPickup.COMPRESSION_FACTOR] += 1;
@@ -197,12 +223,20 @@ public class PickupPool {
             return compression;
         }
 
+        /*
+         * buckets_count[n] += buckets_count[n - 1] / 2
+         * buckets_count[n - 1] %= 2
+         *
+         * We also move the appropriate amount of pickups from buckets_pickups[n - 1] to buckets_pickups[n] as well
+         */
+
         for (int i = 0; i < BUCKET_COUNT; i++) {
             if (i == goal) {
                 if (buckets_count[i] >= goal_n) {
                     // If we can't achieve the next goal, we're done
                     if (!canAchieveNextCompression(buckets_count, goal, i)) break;
 
+                    // Continue onto the next valid goal
                     goal += AbstractPickup.COMPRESSION_FACTOR;
                     goal_n = buckets_count[goal] + 1;
                 } else break;
@@ -249,6 +283,14 @@ public class PickupPool {
         return compression;
     }
 
+    /**
+     * Returns whether, given an array of count buckets, the current goal, and the current iteration,
+     * it's possible to reach the next goal.
+     * @param buckets_count The array of count buckets to use for the calculation.
+     * @param goal The current goal.
+     * @param i The current iteration.
+     * @return Whether it's possible to reach the next compression goal.
+     */
     private boolean canAchieveNextCompression(int[] buckets_count, int goal, int i) {
         // Max compression achieved
         int next_goal = goal + AbstractPickup.COMPRESSION_FACTOR;
