@@ -520,6 +520,10 @@ public class PickupPool {
      * @param sb The {@link SpriteBatch} to draw onto.
      */
     public void renderLocal(SpriteBatch sb) {
+        double pullRange = AbstractSurvivorPlayer.PICKUP_PULL_RANGE * SurvivorDungeon.player.pickupRangeMultiplier;
+        float playerX = SurvivorDungeon.player.basePlayer.hb.cX;
+        float playerY = SurvivorDungeon.player.basePlayer.hb.cY;
+
         forEachLocal(address -> {
             PickupType type = PickupStruct.type(address);
             if (type.image != null) {
@@ -527,12 +531,22 @@ public class PickupPool {
                     AbstractPickup.setColorForCompression(sb, PickupStruct.compression(address));
                 }
 
+                double rotation = PickupStruct.rotation(address);
+                float dx = playerX - PickupStruct.x(address);
+                float dy = playerY - PickupStruct.y(address);
+                // If the pickup doesn't have any initial rotation, can be pulled and is in the player's pull range
+                if (rotation == 0 && !PickupStruct.noPull(address) && dx*dx + dy*dy <= pullRange*pullRange) {
+                    // Rotate depending on how far away from the player the pickup is
+                    rotation = (1f - dx/pullRange) * AbstractPickup.PULL_ROTATION;
+                    if (dx > 0) rotation *= -1;
+                }
+
                 Texture t = type.image.getTexture();
                 sb.draw(new TextureRegion(type.image), PickupStruct.x(address), PickupStruct.drawY(address, type.bobDistance),
                         t.getWidth()/2f, t.getHeight()/2f,
                         t.getWidth(), t.getHeight(),
                         PickupStruct.scale(address) * Settings.scale, PickupStruct.scale(address) * Settings.scale,
-                        PickupStruct.rotation(address));
+                        (float)rotation);
             }
         });
     }

@@ -31,6 +31,10 @@ public class AbstractPickup {
      * Can also be used to scatter pickups on spawn.
      */
     public final static float SCATTER_RANGE = 30f;
+    /**
+     * Pickups that are being pulled will be rotated by up to {@code PULL_ROTATION} degrees towards the player.
+     */
+    public final static float PULL_ROTATION = 15f;
 
     /*===== Textures =====*/
     public final static Texture IMAGE_XP = new Texture("SpireSurvivorsResources/images/pickups/xp.png");
