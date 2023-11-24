@@ -106,10 +106,6 @@ public class SurvivorDungeon {
     }
 
     public void update() {
-        if (player.rewards > 0) {
-            survivorChoiceScreen.open(false);
-            player.rewards--;
-        }
         switch (currentScreen) {
             case PAUSE:
                 survivorPauseScreen.update();
@@ -120,6 +116,10 @@ public class SurvivorDungeon {
             case DEATH:
                 break;
             case NONE:
+                if (player.rewards > 0) {
+                    survivorChoiceScreen.open(false);
+                    player.rewards--;
+                }
                 updateGameLogic();
                 break;
         }
