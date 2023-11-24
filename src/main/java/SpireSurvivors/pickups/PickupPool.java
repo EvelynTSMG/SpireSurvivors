@@ -64,6 +64,17 @@ public class PickupPool {
     }
 
     /**
+     * Returns whether the pool contains a certain pickup.
+     * @param address A pointer to an instance of {@link PickupStruct}.
+     * @return Whether the pool contains the pickup.
+     */
+    public boolean contains(long address) {
+        long x; // This is either equivalent or slightly more optimal to inlining it ourselves
+        return (x = address - poolAddress) >= 0 // Start
+                && x < PickupStruct.SIZE * POOL_SIZE; // End
+    }
+
+    /**
      * Spawn a pickup of {@code type} at ({@code x}, {@code y}) with the given {@code compression}.<br>
      * If {@code mayCompress} is {@code true}, it may attempt to compress the spawned pickup using {@link PickupPool#tryCompress(float, float, PickupType, int) tryCompress()}.
      * @param x The x coordinate where the pickup should spawn.
@@ -102,6 +113,21 @@ public class PickupPool {
         y += MathUtils.random(-AbstractPickup.SCATTER_RANGE, AbstractPickup.SCATTER_RANGE);
 
         return spawn(x, y, type, compression, mayCompress);
+    }
+
+    /**
+     * Removes pickups from any pool.
+     * @param addresses Pointers to {@link PickupStruct}s that should be removed.
+     */
+    public static void remove(long... addresses) {
+        for (long address : addresses) {
+            for (PickupPool pool : pickupPools) {
+                if (pool.contains(address)) {
+                    pool.removeLocal(address);
+                    break;
+                }
+            }
+        }
     }
 
     /**
@@ -146,7 +172,7 @@ public class PickupPool {
      * Removes a pickup from the pool.
      * @param address A pointer to the {@link PickupStruct} that should be removed.
      */
-    public void remove(long address) {
+    public void removeLocal(long address) {
         PickupStruct.deactivate(address);
         usedPickups -= 1;
     }
@@ -489,7 +515,7 @@ public class PickupPool {
                 PickupStruct.type(address).onTouch(address);
                 if (PickupStruct.type(address).canCollect(address)) {
                     PickupStruct.type(address).onCollect(address);
-                    remove(address);
+                    removeLocal(address);
                     return;
                 }
             }
