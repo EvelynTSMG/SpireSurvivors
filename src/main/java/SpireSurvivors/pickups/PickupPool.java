@@ -93,8 +93,9 @@ public class PickupPool {
         }
 
         // All pools must be full, so we add one more
-        pickupPools.add(new PickupPool());
-        return pickupPools.get(pickupPools.size() - 1).spawnLocal(x, y, type, compression, mayCompress);
+        PickupPool pool = new PickupPool();
+        pickupPools.add(pool);
+        return pool.spawnLocal(x, y, type, compression, mayCompress);
     }
 
     /**
