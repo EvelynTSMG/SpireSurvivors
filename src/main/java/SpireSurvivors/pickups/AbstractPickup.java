@@ -23,7 +23,7 @@ public class AbstractPickup {
     /**
      * Compression will attempt to find enough items within {@code COMPRESSION_RANGE} radius
      */
-    public final static float COMPRESSION_RANGE = 20f;
+    public final static float COMPRESSION_RANGE = 30f;
     /**
      * Compression may compress additional pickups and spawn them within {@code SCATTER_RANGE} radius
      * of the original pickup the compression targeted.<br>
