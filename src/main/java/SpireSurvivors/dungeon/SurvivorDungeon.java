@@ -55,7 +55,7 @@ public class SurvivorDungeon {
     public static AbstractSurvivorPlayer player;
     public static SurvivorUI ui;
     public static ArrayList<AbstractSurvivorMonster> monsters = new ArrayList<>();
-    public static ArrayList<PickupPool> pickupPools = new ArrayList<>();
+    public static ArrayList<PickupPool> pickupPools = new ArrayList<>(4);
     public static ArrayList<AbstractGameEffect> effects = new ArrayList<>();
     public static ArrayList<AbstractGameEffect> effectsQueue = new ArrayList<>();
 
