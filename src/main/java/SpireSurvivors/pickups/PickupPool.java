@@ -142,7 +142,7 @@ public class PickupPool {
      * @return The address of the spawned pickup.
      */
     public long spawnLocal(float x, float y, PickupType type, int compression, boolean mayCompress) {
-        if (type.compressable && mayCompress) compression = tryCompress(x, y, type, compression);
+        if (type.compressable && mayCompress) compression = tryCompressOnce(x, y, type, compression);
 
         long address = getInactive();
         PickupStruct.clear(address);
@@ -195,6 +195,18 @@ public class PickupPool {
 
 
     /*===== Compression =====*/
+
+
+    public int tryCompressOnce(float x, float y, PickupType type, int compression) {
+        ArrayList<Long> nearby_pickups = nearby(x, y, AbstractPickup.COMPRESSION_RANGE,
+                address -> PickupStruct.type(address) == type && PickupStruct.compression(address) == compression);
+        if (nearby_pickups.size() < 7) return compression;
+
+       nearby_pickups.subList(0, 7).forEach(PickupPool::remove);
+       return compression + 1;
+    }
+
+    // Broken :(
 
     /**
      * Attempts to compress a potential pickup spawn at ({@code x}, {@code y}) of {@code type}
