@@ -27,6 +27,7 @@ import com.megacrit.cardcrawl.core.Settings;
 import com.megacrit.cardcrawl.dungeons.AbstractDungeon;
 import com.megacrit.cardcrawl.dungeons.Exordium;
 import com.megacrit.cardcrawl.helpers.input.InputAction;
+import com.megacrit.cardcrawl.helpers.input.InputHelper;
 import com.megacrit.cardcrawl.random.Random;
 import com.megacrit.cardcrawl.ui.buttons.DynamicBanner;
 import com.megacrit.cardcrawl.vfx.AbstractGameEffect;
@@ -49,6 +50,7 @@ public class SurvivorDungeon {
     public static final InputAction DOWN = new InputAction(Input.Keys.S);
     public static final InputAction RIGHT = new InputAction(Input.Keys.D);
     public static final InputAction PAUSE = new InputAction(Input.Keys.ESCAPE);
+    public static final InputAction ACTION_MAIN = new InputAction(Input.Keys.SHIFT_LEFT);
 
     public static AbstractSurvivorPlayer player;
     public static SurvivorUI ui;
@@ -167,6 +169,10 @@ public class SurvivorDungeon {
     public void updateInput() {
         if (PAUSE.isJustPressed()) {
             survivorPauseScreen.open(true);
+        }
+
+        if (ACTION_MAIN.isJustPressed()) {
+            PickupPool.spawn(InputHelper.mX, InputHelper.mY, AbstractPickup.PickupType.XP, 2, true);
         }
 
         if (player.movementTutorial.alpha != 0) {
