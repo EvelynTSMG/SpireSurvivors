@@ -14,6 +14,7 @@ public class InputAction {
     private final int[] keys = new int[KEY_COUNT];
     private int button;
     private boolean buttonJustPressed = false;
+    private boolean buttonWasPressed = false;
 
     /**
      * Create a new {@code InputAction}.<br>
@@ -52,10 +53,13 @@ public class InputAction {
     }
 
     public boolean isJustPressed() {
-        return Arrays.stream(keys).anyMatch(Gdx.input::isKeyJustPressed);
+        if (!buttonWasPressed) buttonJustPressed = Gdx.input.isButtonPressed(button);
+        else buttonJustPressed = false;
+        buttonWasPressed = Gdx.input.isButtonPressed(button);
+        return Arrays.stream(keys).anyMatch(Gdx.input::isKeyJustPressed) || buttonJustPressed;
     }
 
     public boolean isPressed() {
-        return Arrays.stream(keys).anyMatch(Gdx.input::isKeyPressed);
+        return Arrays.stream(keys).anyMatch(Gdx.input::isKeyPressed) || buttonWasPressed;
     }
 }
