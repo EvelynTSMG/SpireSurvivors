@@ -13,6 +13,7 @@ public class InputAction {
 
     private final int[] keys = new int[KEY_COUNT];
     private int button;
+    private boolean buttonSet = false;
     private boolean buttonJustPressed = false;
     private boolean buttonWasPressed = false;
 
@@ -33,6 +34,7 @@ public class InputAction {
      */
     public InputAction alt(int button) {
         this.button = button;
+        buttonSet = true;
         return this;
     }
 
@@ -53,9 +55,11 @@ public class InputAction {
     }
 
     public boolean isJustPressed() {
-        if (!buttonWasPressed) buttonJustPressed = Gdx.input.isButtonPressed(button);
-        else buttonJustPressed = false;
-        buttonWasPressed = Gdx.input.isButtonPressed(button);
+        if (buttonSet) {
+            if (!buttonWasPressed) buttonJustPressed = Gdx.input.isButtonPressed(button);
+            else buttonJustPressed = false;
+            buttonWasPressed = Gdx.input.isButtonPressed(button);
+        }
         return Arrays.stream(keys).anyMatch(Gdx.input::isKeyJustPressed) || buttonJustPressed;
     }
 
