@@ -148,10 +148,9 @@ public class SurvivorDungeon {
         spawnController.update();
 
         effects.addAll(effectsQueue);
-        effectsQueue.clear();
         effects.addAll(AbstractDungeon.effectsQueue);
+        effectsQueue.clear();
         AbstractDungeon.effectsQueue.clear();
-
         for (AbstractGameEffect e : effects) {
             e.update();
         }
