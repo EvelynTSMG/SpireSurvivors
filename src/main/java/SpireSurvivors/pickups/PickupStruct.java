@@ -346,7 +346,7 @@ public final class PickupStruct {
      * Sets whether the pickup located at {@code baseAddress} persists after being touched.<br>
      * If {@code true}, the pickup won't be collected.
      * @param baseAddress A pointer to an instance of {@code PickupStruct}.
-     * @return Whether the pickup should be persistent.
+     * @param value Whether the pickup should be persistent.
      * @see PickupBehavior#onTouch(long) PickupBehavior.onTouch()
      * @see PickupBehavior#canCollect(long) PickupBehavior.canCollect()
      * @see PickupBehavior#onCollect(long) PickupBehavior.onCollect()

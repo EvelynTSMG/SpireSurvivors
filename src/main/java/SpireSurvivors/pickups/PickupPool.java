@@ -69,7 +69,7 @@ public class PickupPool {
      * @return Whether the pool contains the pickup.
      */
     public boolean contains(long address) {
-        long x; // This is either equivalent or slightly more optimal to inlining it ourselves
+        long x; // This is either equivalent or slightly more optimal than inlining it ourselves
         return (x = address - poolAddress) >= 0 // Start
                 && x < PickupStruct.SIZE * POOL_SIZE; // End
     }
