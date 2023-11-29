@@ -45,12 +45,13 @@ public class SurvivorDungeon {
         DEATH
     }
     public static final TextureAtlas.AtlasRegion BACKGROUND = new TextureAtlas(Gdx.files.internal("bottomScene/scene.atlas")).findRegion("event");
-    public static final InputAction UP = new InputAction(Input.Keys.W);
-    public static final InputAction LEFT = new InputAction(Input.Keys.A);
-    public static final InputAction DOWN = new InputAction(Input.Keys.S);
-    public static final InputAction RIGHT = new InputAction(Input.Keys.D);
+    public static final InputAction UP = new InputAction(Input.Keys.W, Input.Keys.UP);
+    public static final InputAction LEFT = new InputAction(Input.Keys.A, Input.Keys.LEFT);
+    public static final InputAction DOWN = new InputAction(Input.Keys.S, Input.Keys.DOWN);
+    public static final InputAction RIGHT = new InputAction(Input.Keys.D, Input.Keys.RIGHT);
     public static final InputAction PAUSE = new InputAction(Input.Keys.ESCAPE);
-    public static final InputAction ACTION_MAIN = new InputAction(Input.Keys.SHIFT_LEFT);
+    public static final InputAction ACTION_MAIN = new InputAction(Input.Keys.SHIFT_LEFT).alt(Input.Buttons.LEFT);
+    public static final InputAction ACTION_SUB = new InputAction(Input.Keys.CONTROL_LEFT).alt(Input.Buttons.RIGHT);
 
     public static AbstractSurvivorPlayer player;
     public static SurvivorUI ui;
@@ -172,6 +173,10 @@ public class SurvivorDungeon {
 
         if (ACTION_MAIN.isJustPressed()) {
             PickupPool.spawn(InputHelper.mX, InputHelper.mY, AbstractPickup.PickupType.XP, 2, true);
+        }
+
+        if (ACTION_SUB.isJustPressed()) {
+            player.gainXP(player.xpToNextLevel());
         }
 
         if (player.movementTutorial.alpha != 0) {

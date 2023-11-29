@@ -17,12 +17,12 @@ public class MovementTutorialKey {
     public static final Color FLASH_TEXT_COLOR = Color.LIME.cpy();
     public static final float LERP_LENGTH = 0.1f;
     public static final float KEY_SCALE = 1.2f;
-    public final int key;
+    public final InputAction key;
     public LerpingColor text_color = new LerpingColor(INIT_TEXT_COLOR.cpy(), LERP_LENGTH);
     public boolean justPressed = false;
     public boolean pressed = false;
 
-    public MovementTutorialKey(int key) {
+    public MovementTutorialKey(InputAction key) {
         this.key = key;
     }
 
@@ -44,7 +44,7 @@ public class MovementTutorialKey {
                 0f);
         FontHelper.renderFontCentered(
             sb, FontHelper.buttonLabelFont,
-            Input.Keys.toString(key), x, y,
+            key.getKeyString(), x, y,
             text_color.value.cpy().mul(1f, 1f, 1f, alpha_scale));
     }
 }

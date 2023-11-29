@@ -11,10 +11,10 @@ import com.megacrit.cardcrawl.core.Settings;
 public class MovementTutorial {
     public static final float MOVEMENT_KEY_MARGIN = 2f * Settings.scale;
 
-    public MovementTutorialKey up = new MovementTutorialKey(SurvivorDungeon.UP.getKey());
-    public MovementTutorialKey down = new MovementTutorialKey(SurvivorDungeon.DOWN.getKey());
-    public MovementTutorialKey right = new MovementTutorialKey(SurvivorDungeon.RIGHT.getKey());
-    public MovementTutorialKey left = new MovementTutorialKey(SurvivorDungeon.LEFT.getKey());
+    public MovementTutorialKey up = new MovementTutorialKey(SurvivorDungeon.UP);
+    public MovementTutorialKey down = new MovementTutorialKey(SurvivorDungeon.DOWN);
+    public MovementTutorialKey right = new MovementTutorialKey(SurvivorDungeon.RIGHT);
+    public MovementTutorialKey left = new MovementTutorialKey(SurvivorDungeon.LEFT);
 
     public static final float LERP_LENGTH = 0.1f;
     private float lerpTime = 0f;
