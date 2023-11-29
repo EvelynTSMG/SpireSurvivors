@@ -57,6 +57,13 @@ public class PickupPool {
     /*===== Basic Functionality =====*/
 
     /**
+     * Free the pool memory. Only call when removing the pool.
+     */
+    public void free() {
+        PickupStruct.free(poolAddress);
+    }
+
+    /**
      * @return Whether the pool is full
      */
     public boolean isFull() {
