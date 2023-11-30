@@ -1,5 +1,6 @@
 package SpireSurvivors.ui;
 
+import SpireSurvivors.util.InputAction;
 import SpireSurvivors.util.LerpingColor;
 import com.badlogic.gdx.Input;
 import com.badlogic.gdx.graphics.Color;
